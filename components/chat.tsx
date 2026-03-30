@@ -33,7 +33,7 @@ import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
-import { toast } from "./toast";
+import { toast } from "sonner";
 import type { VisibilityType } from "./visibility-selector";
 
 export function Chat({
@@ -150,14 +150,31 @@ export function Chat({
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
-      console.error("💥 [DEBUG] Chat error occurred:", {
-        error,
-        errorType: error.constructor.name,
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error("💥 [DEBUG] Chat error occurred:", error);
 
-      const messageText = error instanceof Error ? error.message : String(error);
+      const messageText =
+        error instanceof Error
+          ? error.message
+          : typeof (error as any)?.message === "string"
+            ? (error as any).message
+            : String(error);
+
+      const msgLower = messageText.toLowerCase();
+      const isQuotaError =
+        messageText.includes("429") ||
+        msgLower.includes("quota") ||
+        msgLower.includes("resource_exhausted") ||
+        msgLower.includes("resource exhausted") ||
+        msgLower.includes("rate limit") ||
+        msgLower.includes("ratelimit") ||
+        (error as any)?.statusCode === 429;
+
+      if (isQuotaError) {
+        toast.error("Google AI quota exceeded. Please try again later or upgrade your plan.");
+        setDataStream([]);
+        clearError();
+        return;
+      }
 
       if (messageText.includes("thinking is not supported by this model")) {
         const thinkingNotSupportedMessage = "The selected model does not support thinking mode. Please choose a different model or disable thinking mode.";
@@ -220,46 +237,19 @@ export function Chat({
       }
 
       if (error instanceof ChatSDKError) {
-        console.log("🔍 [DEBUG] ChatSDKError details:", {
-          message: error.message,
-        });
-
-        // Check if it's a credit card error
-        if (
-          error.message?.includes("AI Gateway requires a valid credit card")
-        ) {
+        if (error.message?.includes("AI Gateway requires a valid credit card")) {
           setShowCreditCardAlert(true);
         } else {
-          toast({
-            type: "error",
-            description: error.message,
-          });
+          toast.error(error.message);
         }
       } else if (error instanceof Error) {
-        console.log("🔍 [DEBUG] Generic Error details:", {
-          name: error.name,
-          message: error.message,
-        });
-
-        // Handle API key errors
         if (error.message?.includes("Google API key is required")) {
-          toast({
-            type: "error",
-            description:
-              "Please configure your Google API key in Settings to use the chat.",
-          });
+          toast.error("Please configure your Google API key in Settings to use the chat.");
         } else {
-          toast({
-            type: "error",
-            description: error.message,
-          });
+          toast.error(error.message || "An unexpected error occurred");
         }
       } else {
-        console.log("🔍 [DEBUG] Unknown error type:", typeof error, error);
-        toast({
-          type: "error",
-          description: "An unexpected error occurred",
-        });
+        toast.error(messageText || "An unexpected error occurred");
       }
 
       setDataStream([]);
