@@ -815,6 +815,68 @@ describe("Chat API Integration Tests", () => {
         expect(response.status).toBeGreaterThanOrEqual(400);
       });
 
+      it("should reject a message with empty text (bad_request:api)", async () => {
+        const requestBody = {
+          id: "660e8400-e29b-41d4-a716-446655440001",
+          message: {
+            id: "770e8400-e29b-41d4-a716-446655440001",
+            role: "user" as const,
+            parts: [{ type: "text" as const, text: "" }], // empty — fails schema min(1)
+          },
+          selectedChatModel: "gemini-2.5-flash",
+          selectedVisibilityType: "private" as const,
+          thinkingEnabled: false,
+          selectedRepos: [],
+        };
+
+        mockRequest = new Request("http://localhost:3000/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-google-api-key": "test-api-key",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const response = await POST(mockRequest);
+        const body = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(body.code).toBe("bad_request:api");
+        expect(mockChatAgent.chat).not.toHaveBeenCalled();
+      });
+
+      it("should accept a message with whitespace-only text (schema min(1) checks raw length)", async () => {
+        // Zod's z.string().min(1) counts raw length, so "   " passes server validation.
+        // The client-side guard in submitForm handles this via input.trim().length === 0
+        // before it ever reaches the server.
+        const requestBody = {
+          id: "660e8400-e29b-41d4-a716-446655440001",
+          message: {
+            id: "770e8400-e29b-41d4-a716-446655440002",
+            role: "user" as const,
+            parts: [{ type: "text" as const, text: "   " }],
+          },
+          selectedChatModel: "gemini-2.5-flash",
+          selectedVisibilityType: "private" as const,
+        };
+
+        mockRequest = new Request("http://localhost:3000/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-google-api-key": "test-api-key",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const response = await POST(mockRequest);
+
+        // Server accepts it (raw length ≥ 1); client guard prevents it from ever being sent
+        expect(response.status).toBe(200);
+        expect(mockChatAgent.chat).toHaveBeenCalled();
+      });
+
       it("should handle invalid request body", async () => {
         const invalidRequestBody = {
           id: "not-a-uuid",

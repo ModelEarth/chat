@@ -150,7 +150,7 @@ export async function streamMermaidDiagramFix(params: {
     .replace("{errorInfo}", errorInfo);
 
   try {
-    // Use streamObject for structured diagram fixes
+    // Use streamObject for structured diagram fixes (migrate to streamText output:object post-install)
     const { partialObjectStream } = streamObject({
       model,
       system: systemPrompt,

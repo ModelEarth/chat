@@ -251,6 +251,7 @@ export class GoogleChatAgent {
             system: systemPrompt,
             messages,
             temperature: 0.7,
+            maxRetries: 0, // Fail immediately on quota/rate-limit errors instead of retrying
           };
 
           // Add tools if available
@@ -303,8 +304,17 @@ export class GoogleChatAgent {
             await params.onFinish({ messages: event.messages });
           }
         },
-        onError: () => {
-          return "Oops, an error occurred!";
+        onError: (error) => {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes("429") ||
+            msg.toLowerCase().includes("quota") ||
+            msg.toLowerCase().includes("resource_exhausted") ||
+            msg.toLowerCase().includes("rate limit")
+          ) {
+            return "Google AI quota exceeded. Please try again later or upgrade your plan.";
+          }
+          return msg || "Oops, an error occurred!";
         },
       });
 
