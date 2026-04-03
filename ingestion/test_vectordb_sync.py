@@ -32,7 +32,7 @@ def ensure_env() -> Tuple[str, str, str]:
     api = os.getenv("PINECONE_API_KEY")
     voy = os.getenv("VOYAGE_API_KEY")
     if not api or not voy:
-        raise SystemExit("PINECONE_API_KEY and VOYAGE_API_KEY must be set in chat/.env.local or environment")
+        raise SystemExit("PINECONE_API_KEY and VOYAGE_API_KEY must be set in docker/.env, chat/.env, or environment")
 
     # Generate unique repo_name for metadata tagging (not used as namespace anymore)
     repo_name = f"vector-sync-test-{uuid.uuid4().hex[:8]}"

@@ -1,9 +1,7 @@
-import { config } from "dotenv";
 import postgres from "postgres";
+import { loadEnvironment } from "../env-loader";
 
-config({
-  path: ".env.local",
-});
+loadEnvironment();
 
 const resetDatabase = async () => {
   if (!process.env.POSTGRES_URL) {
