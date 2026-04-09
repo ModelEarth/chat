@@ -82,7 +82,7 @@ function PureMultimodalInput({
   githubPAT?: string;
   ragSelectedRepos?: string[];
   onRagSelectedReposChange?: (repos: string[]) => void;
-  availableRepos?: string[];
+  availableRepos?: import("@/lib/repos").Repo[];
   availableReposLoading?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);

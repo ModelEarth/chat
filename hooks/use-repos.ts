@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { Repo } from "@/lib/repos";
 
 type UseReposResult = {
-  repos: string[];
+  repos: Repo[];
   isLoading: boolean;
   error: string | null;
 };
 
 export function useRepos(): UseReposResult {
-  const [repos, setRepos] = useState<string[]>([]);
+  const [repos, setRepos] = useState<Repo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

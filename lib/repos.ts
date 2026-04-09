@@ -3,16 +3,18 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+export type Repo = { name: string; label: string };
+
 /**
  * Default repo list used when .gitmodules and .siterepos are unavailable.
  * These should match the `repo_name` values stored in Pinecone metadata.
  */
-const DEFAULT_REPOS: string[] = [
-  "data-commons",
-  "open-footprint",
-  "community-data",
-  "requests",
-  "useeio-widgets",
+const DEFAULT_REPOS: Repo[] = [
+  { name: "data-commons", label: "data-commons" },
+  { name: "open-footprint", label: "open-footprint" },
+  { name: "community-data", label: "community-data" },
+  { name: "requests", label: "requests" },
+  { name: "useeio-widgets", label: "useeio-widgets" },
 ];
 
 /**
@@ -39,14 +41,19 @@ function parseGitmodules(content: string): string[] {
 
 /**
  * Parse repository names from a .siterepos file.
- * Assumes plain text format: one repo name per line.
- * Lines starting with # are treated as comments.
+ * Supports git config format: [siterepo "name"] with path/url entries.
  */
 function parseSiterepos(content: string): string[] {
-  return content
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith("#"));
+  const repos: string[] = [];
+  const pattern = /\[siterepo\s+"([^"]+)"\]/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(content)) !== null) {
+    const name = match[1].trim();
+    if (name) repos.push(name);
+  }
+
+  return repos;
 }
 
 /**
@@ -54,7 +61,7 @@ function parseSiterepos(content: string): string[] {
  */
 async function readProjectFile(filename: string): Promise<string | null> {
   try {
-    const filePath = resolve(process.cwd(), filename);
+    const filePath = resolve(process.cwd(), "..", filename);
     return await readFile(filePath, "utf-8");
   } catch {
     return null;
@@ -71,28 +78,30 @@ async function readProjectFile(filename: string): Promise<string | null> {
  * Falls back to a hardcoded default list if neither file exists
  * or parsing yields zero results.
  */
-export async function getAvailableRepos(): Promise<string[]> {
-  const repos: string[] = [];
+export async function getAvailableRepos(): Promise<Repo[]> {
+  const repoMap = new Map<string, Repo>();
 
-  // Try .gitmodules
+  // Try .gitmodules — plain name, no suffix
   const gitmodulesContent = await readProjectFile(".gitmodules");
   if (gitmodulesContent) {
-    repos.push(...parseGitmodules(gitmodulesContent));
+    for (const name of parseGitmodules(gitmodulesContent)) {
+      repoMap.set(name, { name, label: name });
+    }
   }
 
-  // Try .siterepos
+  // Try .siterepos — append " (site)" suffix
   const sitereposContent = await readProjectFile(".siterepos");
   if (sitereposContent) {
-    repos.push(...parseSiterepos(sitereposContent));
+    for (const name of parseSiterepos(sitereposContent)) {
+      repoMap.set(name, { name, label: `${name} (site)` });
+    }
   }
 
-  // Deduplicate and sort
-  const unique = [...new Set(repos)].sort();
-
   // Fall back to defaults if nothing was parsed
-  if (unique.length === 0) {
+  if (repoMap.size === 0) {
     return DEFAULT_REPOS;
   }
 
-  return unique;
+  // Sort alphabetically by label
+  return [...repoMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

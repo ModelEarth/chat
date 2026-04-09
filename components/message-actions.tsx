@@ -53,7 +53,7 @@ export function PureMessageActions({
         <div className="relative flex items-center gap-1">
           {setMode && (
             <Action
-              className="-left-12 absolute top-0 opacity-0 transition-opacity group-hover/message:opacity-100"
+              className="-left-12 absolute top-0 transition-opacity group-hover/message:opacity-100"
               onClick={() => setMode("edit")}
               tooltip="Edit"
             >
