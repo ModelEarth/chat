@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Repo } from "@/lib/repos";
 import { cn } from "@/lib/utils";
 
 // GitHub logo icon
@@ -39,7 +40,7 @@ const GitHubIcon = () => (
 );
 
 type ResourceAreaSelectorProps = {
-  availableRepos: string[];
+  availableRepos: Repo[];
   ragSelectedRepos: string[];
   onRagSelectedReposChange: (repos: string[]) => void;
   isLoading?: boolean;
@@ -61,14 +62,14 @@ function PureResourceAreaSelector({
   const allSelected = ragSelectedRepos.length === 0;
 
   const label = allSelected
-    ? "All Areas"
+    ? "Pre-trained Repos"
     : ragSelectedRepos.length === 1
       ? ragSelectedRepos[0]
       : `${ragSelectedRepos.length} Areas`;
 
   const handleToggleRepo = (repoName: string) => {
     if (allSelected) {
-      const next = availableRepos.filter((r) => r !== repoName);
+      const next = availableRepos.filter((r) => r.name !== repoName).map((r) => r.name);
       onRagSelectedReposChange(next);
     } else {
       const isCurrentlySelected = ragSelectedRepos.includes(repoName);
@@ -118,17 +119,17 @@ function PureResourceAreaSelector({
           onCheckedChange={handleSelectAll}
           onSelect={(e) => e.preventDefault()}
         >
-          All Areas
+          Pre-trained Repos
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {availableRepos.map((repo) => (
           <DropdownMenuCheckboxItem
-            key={repo}
-            checked={isRepoChecked(repo)}
-            onCheckedChange={() => handleToggleRepo(repo)}
+            key={repo.name}
+            checked={isRepoChecked(repo.name)}
+            onCheckedChange={() => handleToggleRepo(repo.name)}
             onSelect={(e) => e.preventDefault()}
           >
-            {repo}
+            {repo.label}
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>
