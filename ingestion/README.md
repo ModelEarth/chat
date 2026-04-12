@@ -1,13 +1,13 @@
 # Ingestion Pipeline
 
-Automated vector database synchronization using LlamaIndex for intelligent code chunking and OpenAI for embeddings.
+Automated vector database synchronization using LlamaIndex for intelligent code chunking and [Voyage AI](https://www.voyageai.com/) for embeddings.
 
 ## Overview
 
 The ingestion pipeline keeps the Pinecone vector database in sync with repository changes by:
 1. Detecting changed files via git commit ranges
 2. Chunking code using language-aware parsers
-3. Generating embeddings with OpenAI
+3. Generating embeddings with Voyage AI (`voyage-code-3`)
 4. Upserting/deleting vectors in Pinecone
 
 **Runs automatically** via GitHub Actions on every push/PR merge to `main`.
@@ -326,7 +326,7 @@ python ingestion/test_vectordb_sync.py
 4. **Delete** - Remove file and delete vectors
 
 **Requirements:**
-- Valid `OPENAI_API_KEY`
+- Valid `VOYAGE_API_KEY`
 - Valid `PINECONE_API_KEY`
 - Keys in `codechat/.env` or environment
 
@@ -354,7 +354,7 @@ Upserting: 100%|████████| 25/25 [00:05<00:00, 4.8it/s]
   - Files with errors: 0
   - Vectors deleted: 3 files
   - Chunks upserted: 25
-  - Embedding model: text-embedding-3-small
+  - Embedding model: voyage-code-3
 ```
 
 ## Dependencies
@@ -362,7 +362,7 @@ Upserting: 100%|████████| 25/25 [00:05<00:00, 4.8it/s]
 See [requirements.txt](requirements.txt):
 
 ```txt
-openai>=1.12.0              # Embeddings
+llama-index-embeddings-voyageai>=0.2.0 # Voyage AI embeddings
 pinecone-client>=3.0.0      # Vector storage
 llama-index-core>=0.12.0    # Chunking
 tree-sitter-language-pack   # Code parsing
@@ -375,7 +375,7 @@ tqdm>=4.66.0                # Progress bars
 
 ```bash
 # Required
-OPENAI_API_KEY=sk-...
+VOYAGE_API_KEY=pa-...
 PINECONE_API_KEY=...
 
 # Optional (defaults provided)
@@ -456,7 +456,7 @@ python ingestion/vector_db_sync.py --from-commit HEAD~1 --to-commit HEAD
 **3. "Missing required API keys"**
 ```bash
 # Check environment
-echo $OPENAI_API_KEY
+echo $VOYAGE_API_KEY
 echo $PINECONE_API_KEY
 
 # Or use .env file
