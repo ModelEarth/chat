@@ -5,17 +5,7 @@ import { resolve } from "node:path";
 
 export type Repo = { name: string; label: string };
 
-/**
- * Default repo list used when .gitmodules and .siterepos are unavailable.
- * These should match the `repo_name` values stored in Pinecone metadata.
- */
-const DEFAULT_REPOS: Repo[] = [
-  { name: "data-commons", label: "data-commons" },
-  { name: "open-footprint", label: "open-footprint" },
-  { name: "community-data", label: "community-data" },
-  { name: "requests", label: "requests" },
-  { name: "useeio-widgets", label: "useeio-widgets" },
-];
+const ALLOWED_RAW_HOST = "raw.githubusercontent.com";
 
 /**
  * Parse repository names from a .gitmodules file.
@@ -29,11 +19,8 @@ function parseGitmodules(content: string): string[] {
 
   while ((match = pattern.exec(content)) !== null) {
     const raw = match[1].trim();
-    // Take the last path segment (e.g., "path/to/repo" → "repo")
     const name = raw.split("/").pop()?.trim();
-    if (name) {
-      repos.push(name);
-    }
+    if (name) repos.push(name);
   }
 
   return repos;
@@ -57,7 +44,7 @@ function parseSiterepos(content: string): string[] {
 }
 
 /**
- * Read a file from the project root, returning null if it doesn't exist.
+ * Read a file from the webroot root (one level above chat/), returning null if not found.
  */
 async function readProjectFile(filename: string): Promise<string | null> {
   try {
@@ -69,19 +56,38 @@ async function readProjectFile(filename: string): Promise<string | null> {
 }
 
 /**
+ * Fetch raw file content from a URL.
+ * Only allows https://raw.githubusercontent.com/ URLs to prevent SSRF.
+ * Returns null on failure.
+ */
+async function fetchRemoteFile(url: string): Promise<string | null> {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== ALLOWED_RAW_HOST || parsed.protocol !== "https:") {
+      console.warn(`[repos] Blocked fetch from disallowed host: ${url}`);
+      return null;
+    }
+
+    const response = await fetch(url, { next: { revalidate: 3600 } });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get the list of available repositories for RAG filtering.
  *
- * Attempts to read repo names from:
- *   1. .gitmodules (git submodule config)
- *   2. .siterepos (plain text, one repo per line)
- *
- * Falls back to a hardcoded default list if neither file exists
- * or parsing yields zero results.
+ * Priority:
+ *   1. Local ../. gitmodules and ../.siterepos (when running inside webroot)
+ *   2. Remote URLs defined in ../siteconfig.yaml (fallback for deployed environments)
+ *   3. Empty list if nothing is available
  */
 export async function getAvailableRepos(): Promise<Repo[]> {
   const repoMap = new Map<string, Repo>();
 
-  // Try .gitmodules — plain name, no suffix
+  // — Local files (dev / self-hosted) —
   const gitmodulesContent = await readProjectFile(".gitmodules");
   if (gitmodulesContent) {
     for (const name of parseGitmodules(gitmodulesContent)) {
@@ -89,7 +95,6 @@ export async function getAvailableRepos(): Promise<Repo[]> {
     }
   }
 
-  // Try .siterepos — append " (site)" suffix
   const sitereposContent = await readProjectFile(".siterepos");
   if (sitereposContent) {
     for (const name of parseSiterepos(sitereposContent)) {
@@ -97,11 +102,33 @@ export async function getAvailableRepos(): Promise<Repo[]> {
     }
   }
 
-  // Fall back to defaults if nothing was parsed
+  // — Remote fallback via env vars (deployed environments e.g. Vercel) —
   if (repoMap.size === 0) {
-    return DEFAULT_REPOS;
+    const gitmodulesUrl = process.env.RAG_GITMODULES_URL ?? null;
+    const sitereposUrl = process.env.RAG_SITEREPOS_URL ?? null;
+
+    if (gitmodulesUrl) {
+      const remote = await fetchRemoteFile(gitmodulesUrl);
+      if (remote) {
+        for (const name of parseGitmodules(remote)) {
+          repoMap.set(name, { name, label: name });
+        }
+      }
+    }
+
+    if (sitereposUrl) {
+      const remote = await fetchRemoteFile(sitereposUrl);
+      if (remote) {
+        for (const name of parseSiterepos(remote)) {
+          repoMap.set(name, { name, label: `${name} (site)` });
+        }
+      }
+    }
+
+    if (!gitmodulesUrl && !sitereposUrl) {
+      console.warn("[repos] RAG_GITMODULES_URL and RAG_SITEREPOS_URL are not set — no repos available.");
+    }
   }
 
-  // Sort alphabetically by label
   return [...repoMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
