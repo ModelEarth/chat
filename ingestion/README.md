@@ -485,10 +485,5 @@ pc.create_index(
 
 ## Related Documentation
 
-<<<<<<< HEAD
 - [Main README](https://model.earth/chat) - System overview
 - [LlamaChunker](https://github.com/ModelEarth/chat/blob/main/ingestion/llama_chunker.py) - Chunking implementation
-=======
-- [Main README](../README.md) - System overview
-- [LlamaChunker](llama_chunker.py) - Chunking implementation
->>>>>>> upstream/main
