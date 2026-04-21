@@ -11,7 +11,8 @@ export default async function ChatLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const isCollapsed = cookieStore.get("sidebar_state")?.value !== "true";
+  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
+  const isCollapsed = sidebarCookie === "false";
 
   return (
     <DataStreamProvider>

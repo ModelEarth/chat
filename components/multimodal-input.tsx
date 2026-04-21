@@ -33,11 +33,10 @@ import {
   PromptInputToolbar,
   PromptInputTools,
 } from "./elements/prompt-input";
-import { GitHubRepoModal, ResourceAreaSelector } from "@/lib/github-components";
+import { GitHubRepoModal } from "@/lib/github-components";
 import { ArrowUpIcon, StopIcon } from "./icons";
 import { ModelSelector } from "./model-selector";
 import { PreviewAttachment } from "./preview-attachment";
-import { SuggestedActions } from "./suggested-actions";
 import { ThinkingModeToggle } from "./thinking-mode-toggle";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
@@ -59,10 +58,7 @@ function PureMultimodalInput({
   onModelChange,
   usage,
   githubPAT,
-  ragSelectedRepos,
-  onRagSelectedReposChange,
-  availableRepos,
-  availableReposLoading,
+  // ragSelectedRepos, onRagSelectedReposChange, availableRepos, availableReposLoading — moved to sidebar Sources panel
 }: {
   chatId: string;
   input: string;
@@ -80,10 +76,7 @@ function PureMultimodalInput({
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
   githubPAT?: string;
-  ragSelectedRepos?: string[];
-  onRagSelectedReposChange?: (repos: string[]) => void;
-  availableRepos?: import("@/lib/repos").Repo[];
-  availableReposLoading?: boolean;
+  // ragSelectedRepos, onRagSelectedReposChange, availableRepos, availableReposLoading — moved to sidebar Sources panel
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -480,18 +473,7 @@ function PureMultimodalInput({
 
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
-      {messages.length === 0 &&
-        attachments.length === 0 &&
-        uploadQueue.length === 0 && (
-          <SuggestedActions
-            adminConfig={adminConfig}
-            chatId={chatId}
-            selectedModelId={selectedModelId}
-            selectedProvider={selectedProvider}
-            selectedVisibilityType={selectedVisibilityType}
-            sendMessage={sendMessage}
-          />
-        )}
+      {/* Suggested actions removed */}
 
       <input
         className="-top-4 -left-4 pointer-events-none fixed size-0.5 opacity-0"
@@ -734,6 +716,7 @@ function PureMultimodalInput({
               </Button>
             )}
 
+            {/* Pre-trained Repos selector moved to sidebar Sources panel
             {availableRepos && onRagSelectedReposChange && (
               <ResourceAreaSelector
                 availableRepos={availableRepos}
@@ -742,6 +725,7 @@ function PureMultimodalInput({
                 ragSelectedRepos={ragSelectedRepos ?? []}
               />
             )}
+            */}
 
             <ModelSelector
               adminConfig={adminConfig || undefined}
@@ -812,15 +796,7 @@ export const MultimodalInput = memo(
     if (prevProps.githubPAT !== nextProps.githubPAT) {
       return false;
     }
-    if (!equal(prevProps.ragSelectedRepos, nextProps.ragSelectedRepos)) {
-      return false;
-    }
-    if (!equal(prevProps.availableRepos, nextProps.availableRepos)) {
-      return false;
-    }
-    if (prevProps.availableReposLoading !== nextProps.availableReposLoading) {
-      return false;
-    }
+    // ragSelectedRepos, availableRepos, availableReposLoading — moved to sidebar Sources panel
 
     return true;
   }
