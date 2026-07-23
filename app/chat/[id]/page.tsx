@@ -7,7 +7,8 @@ import { DataStreamHandler } from "@/components/data-stream-handler";
 // Default model constant
 const DEFAULT_CHAT_MODEL = "gemini-2.5-flash";
 
-import { getCurrentUser, isAuthRequired } from "@/lib/auth/server";
+import { getCurrentUser, isAuthRequired, isEmailPasswordUser } from "@/lib/auth/server";
+import { getConfiguredSocialProviders } from "@/lib/auth/social-providers";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import {
   ActivityCategory,
@@ -96,15 +97,22 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   const lastContext = (chat?.lastContext as any) ?? undefined;
   const initialChatModel = chatModelFromCookie?.value ?? DEFAULT_CHAT_MODEL;
 
+  const [emailUser, socialProviders] = await Promise.all([
+    isEmailPasswordUser(),
+    Promise.resolve(getConfiguredSocialProviders()),
+  ]);
+
   return (
     <>
       <Chat
         autoResume={true}
+        hasSocialProviders={socialProviders.length > 0}
         id={chatId}
         initialChatModel={initialChatModel}
         initialLastContext={lastContext}
         initialMessages={uiMessages}
         initialVisibilityType={visibility}
+        isEmailUser={emailUser}
         isReadonly={isReadonly}
       />
       <DataStreamHandler />

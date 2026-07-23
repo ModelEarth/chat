@@ -2,6 +2,9 @@ import type { Session, User } from "./types";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/instance";
+import { db, isDbConfigured } from "@/lib/db/queries/base";
+import { betterAuthAccount } from "@/lib/db/drizzle-schema";
+import { eq } from "drizzle-orm";
 
 export type ServerAuthResult = { user: User; session: Session };
 
@@ -104,4 +107,20 @@ export function createAuthErrorResponse(error: ServerAuthError | Error): Respons
 // Keep isAdmin for callers that use it
 export async function isAdmin(user?: User | null): Promise<boolean> {
   return (await getUserRole(user)) === "admin";
+}
+
+// Returns true when the current user is logged in exclusively via
+// email/password (no social accounts linked). Used to show the privacy banner.
+export async function isEmailPasswordUser(): Promise<boolean> {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !isDbConfigured || !db) return false;
+    const accounts = await db
+      .select({ providerId: betterAuthAccount.providerId })
+      .from(betterAuthAccount)
+      .where(eq(betterAuthAccount.userId, user.id));
+    return accounts.length > 0 && accounts.every((a) => a.providerId === "credential");
+  } catch {
+    return false;
+  }
 }

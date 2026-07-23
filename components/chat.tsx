@@ -33,6 +33,7 @@ import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
+import { PromptPrivacyBanner } from "./prompt-privacy-banner";
 import { RagSourcesPanel } from "./rag-sources-panel";
 import { RagTimingPanel } from "./rag-timing-panel";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
@@ -48,6 +49,8 @@ export function Chat({
   isReadonly,
   autoResume,
   initialLastContext,
+  isEmailUser = false,
+  hasSocialProviders = false,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -56,6 +59,8 @@ export function Chat({
   isReadonly: boolean;
   autoResume: boolean;
   initialLastContext?: AppUsage;
+  isEmailUser?: boolean;
+  hasSocialProviders?: boolean;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -558,7 +563,13 @@ export function Chat({
 
         {timingData && <RagTimingPanel timing={timingData} />}
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-[26px] pb-3 md:px-[34px] md:pb-4">
+        <div className="sticky bottom-0 z-1 w-full bg-background">
+          {!isReadonly && (
+            <div className="mx-auto w-full max-w-4xl px-[26px] md:px-[34px]">
+              <PromptPrivacyBanner isEmailUser={isEmailUser} hasSocialProviders={hasSocialProviders} />
+            </div>
+          )}
+          <div className="mx-auto flex w-full max-w-4xl gap-2 px-[26px] pb-3 md:px-[34px] md:pb-4">
           {!isReadonly && (
             <MultimodalInput
               attachments={attachments}
@@ -578,6 +589,7 @@ export function Chat({
               usage={usage}
             />
           )}
+          </div>
         </div>
       </div>
 
