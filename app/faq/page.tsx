@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+// @ts-ignore — yaml v2 ships its own types; tsconfig moduleResolution doesn't resolve them
+import { parse } from "yaml";
 import { Button } from "@/components/ui/button";
 import { SiteFooter } from "@/components/site-footer";
 import { VercelIcon } from "@/components/icons";
@@ -8,10 +12,27 @@ import {
     Zap,
     Users,
     Globe,
-    Lock,
     Sparkles,
     CheckCircle2
 } from "lucide-react";
+
+type ChatSite = { title: string; url: string; description?: string };
+
+function getChatSites(): ChatSite[] {
+    try {
+        const candidates = [
+            resolve(process.cwd(), "chatsites.yaml"),
+            resolve(process.cwd(), "../chatsites.yaml"),
+        ];
+        const filePath = candidates.find((p) => existsSync(p));
+        if (!filePath) return [];
+        const raw = readFileSync(filePath, "utf-8");
+        const data = parse(raw) as { sites?: ChatSite[] };
+        return data?.sites ?? [];
+    } catch {
+        return [];
+    }
+}
 
 export default function FAQPage() {
     const faqs = [
@@ -113,6 +134,7 @@ export default function FAQPage() {
         }
     ];
 
+    const chatSites = getChatSites();
     const sysMsg = ``;
 
     return (
@@ -229,6 +251,40 @@ export default function FAQPage() {
                     </div>
                 </div>
             </section>
+
+            {/* Chat Sites */}
+            {chatSites.length > 0 && (
+                <section className="px-[34px] pb-16">
+                    <div className="container mx-auto">
+                        <div className="mb-8 flex items-center gap-4">
+                            <div className="inline-flex p-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500">
+                                <Globe className="h-6 w-6 text-white" />
+                            </div>
+                            <h2 className="font-bold text-3xl">Chat Sites</h2>
+                        </div>
+                        <div className="grid gap-6 md:grid-cols-3">
+                            {chatSites.map((site) => (
+                                <Link
+                                    key={site.url}
+                                    href={site.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="group rounded-2xl border bg-card p-6 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                                >
+                                    <h3 className="mb-2 font-semibold text-lg group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-indigo-500 group-hover:to-purple-500 transition-all">
+                                        {site.title}
+                                    </h3>
+                                    {site.description && (
+                                        <p className="text-muted-foreground text-sm leading-relaxed">
+                                            {site.description}
+                                        </p>
+                                    )}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Still Have Questions */}
             <section className="px-[34px] py-20">
