@@ -1,0 +1,31 @@
+{
+  "name": "chat-nextjs",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // Required for the Postgres (Supabase) connection to work on Workers.
+  // The "postgres" npm package (porsager/postgres) does NOT run on Workers —
+  // it needs raw TCP sockets Workers don't expose the same way Node does.
+  // Hyperdrive is Cloudflare's proxy for reaching an existing Postgres
+  // instance (like Supabase) from a Worker, paired with the "pg" driver
+  // instead of "postgres". Create it once with:
+  //   npx wrangler hyperdrive create chat-db --connection-string="<your Supabase POSTGRES_URL>"
+  // then paste the id it prints below.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "<hyperdrive-id-from-wrangler-create>"
+    }
+  ]
+
+  // Optional — only needed if/when you use ISR or Next's data cache:
+  // "kv_namespaces": [
+  //   { "binding": "NEXT_CACHE_WORKERS_KV", "id": "<your-kv-namespace-id>" }
+  // ]
+}

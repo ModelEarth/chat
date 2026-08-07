@@ -50,3 +50,7 @@ tsconfig.tsbuildinfo
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Cloudflare deploy
+.open-next/
+.wrangler/
