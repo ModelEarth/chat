@@ -1,0 +1,13 @@
+sites:
+  - title: "Earthscape"
+    url: "https://earthscape.model.earth"
+    description: "AI chat with code, data and diagram tools"
+  - title: "ModelEarth CodeChat"
+    url: "https://codechat.model.earth"
+    description: "Code-focused AI assistant for ModelEarth repos"
+  - title: "ModelEarth Webroot"
+    url: "https://model.earth"
+    description: "Main ModelEarth deployment"
+  - title: "VercelRoot Experiment"
+    url: "https://vercel-root-git-main-dream-studio2.vercel.app"
+    description: "Approval only — Vercel team access required"
