@@ -1,0 +1,16 @@
+{
+  "environment": "production",
+  "envFile": "../../docker/.env",
+  "vars": [
+    { "source": "GOOGLE_CLIENT_ID", "target": "GOOGLE_CLIENT_ID" },
+    { "source": "GOOGLE_CLIENT_SECRET", "target": "GOOGLE_CLIENT_SECRET" },
+    { "source": "GITHUB_CLIENT_ID", "target": "GITHUB_CLIENT_ID" },
+    { "source": "GITHUB_CLIENT_SECRET", "target": "GITHUB_CLIENT_SECRET" },
+    { "source": "LINKEDIN_CLIENT_ID", "target": "LINKEDIN_CLIENT_ID" },
+    { "source": "LINKEDIN_CLIENT_SECRET", "target": "LINKEDIN_CLIENT_SECRET" },
+    { "source": "MICROSOFT_CLIENT_ID", "target": "MICROSOFT_CLIENT_ID" },
+    { "source": "MICROSOFT_CLIENT_SECRET", "target": "MICROSOFT_CLIENT_SECRET" },
+    { "source": "FACEBOOK_APP_ID", "target": "FACEBOOK_CLIENT_ID" },
+    { "source": "FACEBOOK_APP_SECRET", "target": "FACEBOOK_CLIENT_SECRET" }
+  ]
+}
