@@ -347,7 +347,7 @@
 
   var LEGACY_KEY_TO_PROVIDER = {
     gemini_api_key:   'google',
-    claude_api_key:   'anthropic',
+    anthropic_api_key:   'anthropic',
     openai_api_key:   'openai',
     xai_api_key:      'xai',
     groq_api_key:     'groq',
