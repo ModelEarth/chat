@@ -338,29 +338,23 @@ function tryStatic(pathname, res) {
     return false
   }
 
-  // /chat/know — static embed sample demonstrating trade.js's autoload mode,
-  // viewable with no Node.js process running (just the static file server).
-  // Unlike /chat/keys and /chat/auth (which have real Next.js pages at their
-  // root and only serve sub-paths statically), no Next.js route backs
-  // /chat/know, so the root path is served here too, not left to fall
-  // through to Next.js. This is a separate thing from the top-level /know
-  // Next.js route (chat/app/know/), which only exists when Next.js is
-  // actually running and is wrapped in the chat app's own navigation.
+  // /know and /chat/know — static embed sample demonstrating trade.js's
+  // autoload mode, living in the top-level know/ submodule. Root /know is a
+  // real Next.js page (chat/app/know/) that embeds a different asset
+  // (public/know/embed.html) via iframe, so — like /keys and /auth — the
+  // root path falls through to Next.js here; only sub-paths (e.g.
+  // /know/index.html) are served statically, straight from the submodule.
   const isChatKnowRoute = top === 'chat' && segments[1] === 'know'
+  const isKnowRoute = top === 'know' || isChatKnowRoute
 
-  if (isChatKnowRoute) {
-    const relativeSegments = segments.slice(2)
-    const filePath = join(CHAT_DIR, 'know', ...relativeSegments)
+  if (isKnowRoute) {
+    const relativeSegments = isChatKnowRoute ? segments.slice(2) : segments.slice(1)
+    if (relativeSegments.length === 0) return false
+
+    const filePath = join(WEBROOT, 'know', ...relativeSegments)
     try {
       const stat = statSync(filePath)
       if (stat.isFile()) { serveFile(filePath, res); return true }
-      if (stat.isDirectory()) {
-        const idx = join(filePath, 'index.html')
-        if (existsSync(idx)) {
-          if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
-          serveFile(idx, res); return true
-        }
-      }
     } catch { /* not found */ }
     return false
   }
@@ -705,7 +699,7 @@ app.prepare().then(() => {
       console.log(`  Sanity site : http://${HOSTNAME}:${PORT}${SANITY_BASE_PATH}/`)
       console.log(`  Sanity admin: http://${HOSTNAME}:${PORT}${SANITY_BASE_PATH}/admin`)
       console.log(`  Key manager : http://${HOSTNAME}:${PORT}/chat/keys/`)
-      console.log(`  Know (static): http://${HOSTNAME}:${PORT}/chat/know/`)
+      console.log(`  Know (static): http://${HOSTNAME}:${PORT}/know/index.html`)
       console.log(`  Know (Next) : http://${HOSTNAME}:${PORT}/know`)
       console.log(`  Static      : all webroot dirs except /chat and /sanity`)
     })
