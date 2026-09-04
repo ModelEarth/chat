@@ -355,9 +355,11 @@ function tryStatic(pathname, res) {
       const stat = statSync(filePath)
       if (stat.isFile()) { serveFile(filePath, res); return true }
       if (stat.isDirectory()) {
-        if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
         const idx = join(filePath, 'index.html')
-        if (existsSync(idx)) { serveFile(idx, res); return true }
+        if (existsSync(idx)) {
+          if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
+          serveFile(idx, res); return true
+        }
       }
     } catch { /* not found */ }
     return false
@@ -371,9 +373,16 @@ function tryStatic(pathname, res) {
     const stat = statSync(filePath)
     if (stat.isFile()) { serveFile(filePath, res); return true }
     if (stat.isDirectory()) {
-      if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
+      // Only redirect to the trailing-slash form when there's an index.html to
+      // serve there — otherwise a directory with no index.html (e.g. a
+      // submodule whose content is served by a Next.js route of the same
+      // name, like /know) would redirect to add the slash while Next.js
+      // redirects right back to strip it, looping forever.
       const idx = join(filePath, 'index.html')
-      if (existsSync(idx)) { serveFile(idx, res); return true }
+      if (existsSync(idx)) {
+        if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
+        serveFile(idx, res); return true
+      }
     }
   } catch { /* not found — let Next.js return its 404 */ }
   return false
