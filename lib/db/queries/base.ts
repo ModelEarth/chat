@@ -1,20 +1,12 @@
 import "server-only";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 
 // db is null when POSTGRES_URL is not set (stateless / OAuth-only mode).
 // Callers that need DB must check isDbConfigured before using db.
 export const isDbConfigured = !!process.env.POSTGRES_URL;
 
-const client = isDbConfigured
-  ? postgres(process.env.POSTGRES_URL!, {
-      max: 1,
-      prepare: false,
-      idle_timeout: 20,
-      connect_timeout: 10,
-      ssl: "require",
-    })
-  : null;
+const client = isDbConfigured ? neon(process.env.POSTGRES_URL!) : null;
 
 export const db = client ? drizzle(client) : null;
 
