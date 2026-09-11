@@ -211,6 +211,12 @@ Agent behavior when adding a new env var example:
 1. Add the placeholder + comment to `docker/.env.example`.
 2. **Ask the user** whether the same placeholder should also be appended to `docker/.env` (the live config). Don't add it silently — the live file may already be populated and the user may want to set a real value rather than a placeholder.
 
+### Vector DB sync (RAG ingestion)
+
+`chat/ingestion/vector_db_sync.py` keeps the **Pinecone** index (embeddings via Voyage AI's `voyage-code-3`) in sync with the repo. It supports incremental modes (`--files`, `--from-commit`, changed-files list) as well as `--reindex-all`.
+
+**Never run `--reindex-all` without explicit user confirmation.** It wipes the entire shared Pinecone index (not scoped to a branch, user, or namespace) before rebuilding from scratch — anyone else relying on that index loses search results until the rebuild finishes. The script itself now requires `--yes-i-know-this-wipes-shared-index` (or an interactive y/N prompt) to proceed; do not pass that flag on the user's behalf without them explicitly asking for a full reindex/rebuild. Prefer the incremental modes for normal sync.
+
 ---
 
 ## Key Architectural Patterns
