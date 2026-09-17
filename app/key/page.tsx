@@ -114,8 +114,29 @@ export default function KeyPage() {
             </p>
           )}
         </div>
+
+        {!loaded && (
+          <div className="key-loading" role="status" aria-label="Loading key settings">
+            <span className="key-spinner" />
+          </div>
+        )}
         <div id="key-root" />
       </div>
+
+      <style>{`
+        .key-loading { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
+        .key-spinner {
+          width: 150px;
+          height: 150px;
+          border: 16px solid #e5e7eb;
+          border-top-color: #16a34a;
+          border-radius: 50%;
+          animation: key-spin 0.8s linear infinite;
+        }
+        @keyframes key-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
 
       <Script src="/keys/providers.js" strategy="beforeInteractive" />
       <Script

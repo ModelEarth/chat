@@ -398,11 +398,15 @@ GITHUB_SHA=abc123              # Auto-set in Actions
 
 ## Disaster Recovery
 
-If the vector database is corrupted or needs to be completely rebuilt, you can re-index the entire repository natively using the sync script:
+If the vector database is corrupted or needs to be completely rebuilt, you can re-index the entire repository natively using the sync script.
+
+**Warning:** `--reindex-all` wipes the entire shared Pinecone index (not scoped to a branch or namespace) before rebuilding — anyone querying it loses search results until the rebuild finishes. Prefer `--from-commit`/`--files` for normal syncs. Only run this when you actually intend a full rebuild.
 
 ```bash
-# Wipe all vectors and re-index the entire repository from scratch
-python ingestion/vector_db_sync.py --reindex-all --repo-root .
+# Wipe all vectors and re-index the entire repository from scratch.
+# Interactive terminals get a y/N confirmation prompt; non-interactive
+# contexts (CI, scripts) must pass the flag below explicitly.
+python ingestion/vector_db_sync.py --reindex-all --yes-i-know-this-wipes-shared-index --repo-root .
 ```
 
 ## Architecture Decisions

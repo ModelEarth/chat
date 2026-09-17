@@ -287,7 +287,7 @@ class LocalStorageManager implements StorageManager {
   /**
    * Migrate API keys from legacy localStorage formats into settings_api-keys.
    * - Reads `aPro` (requests/engine format): { GEMINI_API_KEY: "...", ... }
-   * - Reads per-key entries: gemini_api_key, claude_api_key, openai_api_key, xai_api_key
+   * - Reads per-key entries: gemini_api_key, anthropic_api_key, openai_api_key, xai_api_key
    * Runs safely if called multiple times (skips already-set providers, removes legacy keys).
    */
   migrateFromLegacy(): void {
@@ -312,7 +312,7 @@ class LocalStorageManager implements StorageManager {
     // Map from ${aiType}_api_key localStorage entries → provider IDs
     const LEGACY_KEY_TO_PROVIDER: Record<string, APIProvider> = {
       gemini_api_key: "google",
-      claude_api_key: "anthropic",
+      anthropic_api_key: "anthropic",
       openai_api_key: "openai",
       xai_api_key: "xai",
       groq_api_key: "groq",

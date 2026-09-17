@@ -787,7 +787,11 @@ def parse_args():
                         help="Path to the git superproject root (default: current dir)")
     parser.add_argument("--reindex-all", action="store_true",
                         help="Wipe all vectors and re-index the entire repository from scratch. "
-                             "Automatically handles the empty-tree comparison.")
+                             "Automatically handles the empty-tree comparison. "
+                             "Requires --yes-i-know-this-wipes-shared-index, or confirmation at an interactive prompt.")
+    parser.add_argument("--yes-i-know-this-wipes-shared-index", dest="confirm_wipe", action="store_true",
+                        help="Required alongside --reindex-all in non-interactive contexts. "
+                             "Confirms you intend to wipe the entire shared Pinecone index, not just your own changes.")
     parser.add_argument("--skip-on-missing-keys", action="store_true",
                         help="Exit gracefully (code 0) if API keys are missing instead of raising an error")
     parser.add_argument("--repo-name", dest="repo_name", default=None,
@@ -1104,6 +1108,20 @@ def main_entry():
         raise RuntimeError("--reindex-all cannot be combined with --files, --retry-errors, or changed_files")
 
     if args.reindex_all:
+        if not args.confirm_wipe:
+            if sys.stdin.isatty():
+                reply = input(
+                    "This will WIPE THE ENTIRE SHARED PINECONE INDEX and rebuild it from scratch, "
+                    "affecting everyone who queries it until the rebuild finishes. "
+                    "Type 'yes' to continue: "
+                )
+                if reply.strip().lower() != "yes":
+                    raise RuntimeError("--reindex-all aborted: confirmation not given")
+            else:
+                raise RuntimeError(
+                    "--reindex-all requires --yes-i-know-this-wipes-shared-index in non-interactive contexts "
+                    "(it wipes the entire shared Pinecone index, not just your own changes)"
+                )
         logger.info("--reindex-all: Will wipe all vectors and re-index everything")
         files_to_process = compute_reindex_all_files(args.repo_root, errors_out)
         if not files_to_process:

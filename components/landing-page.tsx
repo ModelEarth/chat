@@ -37,7 +37,7 @@ export function LandingPage() {
 
             {/* Subheading */}
             <p className="mx-auto mb-8 max-w-3xl text-muted-foreground text-xl md:text-2xl leading-relaxed">
-              Abundance engineering, creative planning, and intelligence orchestration
+              Abundance engineering and creative intelligence orchestration
             </p>
 
             {/* CTA Buttons */}
