@@ -555,5 +555,4 @@ Tests live in `tests/`. Fixtures in `tests/fixtures/`.
 ## Git Workflow
 
 - Do **not** commit automatically — only commit when the user explicitly asks
-- Use `./git.sh push` from the webroot root (not from inside `chat/`)
-- This repo is a **site repo** (in `.siterepos`), not a git submodule
+- Push this site repo from the parent root folder (not from inside `chat/`)
