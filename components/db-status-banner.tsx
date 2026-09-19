@@ -42,6 +42,16 @@ export function DbStatusBanner({
       className={`flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200 ${className}`}
     >
       <span>{message}</span>
+      {status === "not-configured" && (
+        <a
+          href={SETUP_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 underline hover:opacity-80"
+        >
+          Supabase steps
+        </a>
+      )}
       <a
         href={linkHref}
         target="_blank"
