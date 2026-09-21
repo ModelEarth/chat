@@ -36,6 +36,7 @@ import { MultimodalInput } from "./multimodal-input";
 import { PromptPrivacyBanner } from "./prompt-privacy-banner";
 import { RagSourcesPanel } from "./rag-sources-panel";
 import { RagTimingPanel } from "./rag-timing-panel";
+import { RepoDocsPanel } from "./repo-docs-panel";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "sonner";
 import type { VisibilityType } from "./visibility-selector";
@@ -485,6 +486,23 @@ export function Chat({
           isReadonly={isReadonly}
           selectedVisibilityType={initialVisibilityType}
         />
+
+        {(() => {
+          const lastUserMessage = [...messages]
+            .reverse()
+            .find((m) => m.role === "user");
+          const lastUserText =
+            lastUserMessage?.parts
+              ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+              .map((p) => p.text)
+              .join(" ") ?? "";
+          return (
+            <RepoDocsPanel
+              query={lastUserText}
+              selectedRepos={ragSelectedReposRef.current}
+            />
+          );
+        })()}
 
         <Messages
           chatId={id}
