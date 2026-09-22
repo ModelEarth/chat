@@ -79,8 +79,10 @@ export default function KeysPage() {
           <h1>API Key Settings</h1>
           <p>Add your API keys to unlock AI models and Github integration.</p>
 
-          {noKeys && (
-            <p id="gemini-starter-copy" style={{ marginTop: "10px", marginBottom: "12px", fontSize: "0.9rem" }}>
+          {/* Always mounted, toggled with `hidden`: key-manager.js removes this element
+              itself when a Google key validates, so React unmounting it too would
+              throw "removeChild: not a child of this node". */}
+          <p hidden={!noKeys} id="gemini-starter-copy" style={{ marginTop: "10px", marginBottom: "12px", fontSize: "0.9rem" }}>
               You can start with a{" "}
               <a
                 href="https://aistudio.google.com/app/apikey"
@@ -92,7 +94,6 @@ export default function KeysPage() {
               </a>
               .
             </p>
-          )}
 
           {browserKeyProviders.length > 0 && (
             <p
