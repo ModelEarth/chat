@@ -220,7 +220,9 @@ export function RepoDocsPanel({
       .then((data) => {
         const result: Answer[] | null = data.answers ?? null;
         setAnswers(result);
-        if (result) writeCache(key, result);
+        // Only cache fully successful results — otherwise a temporary failure
+        // (missing key, retired model) would be replayed for the whole session.
+        if (result?.every((a) => !a.error)) writeCache(key, result);
       })
       .catch((err) => {
         if (err.name !== "AbortError") {

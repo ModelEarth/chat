@@ -4,6 +4,7 @@ import { generateText } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { PROVIDER_MAP } from "@/lib/providers";
 import { getRepoDocs, formatRepoDocsContext } from "./repo-docs";
 
 /**
@@ -26,13 +27,41 @@ export type RepoDocsAnswerResult = {
   answers: RepoDocsAnswer[];
 };
 
-// Picked to match model IDs already used elsewhere in this codebase
-// (worker/src/index.js uses claude-sonnet-4-6 / gpt-4o-mini) — not a spec
-// from anyone, just consistency. Easy to change in one place.
+// The model each provider answers with is that provider's default in the
+// shared registry (keys/providers.js) — the same list the model picker uses —
+// so this can't drift from what the rest of the app runs. The fallbacks only
+// apply if the registry has no active model for a provider.
+const FALLBACK_MODEL_IDS: Record<RepoDocsProvider, string> = {
+  google: "gemini-2.5-flash",
+  anthropic: "claude-3-5-sonnet-20241022",
+  openai: "gpt-4o",
+};
+
+// Google has been retiring model versions faster than keys/providers.js gets
+// updated — 2.0-flash, then 2.5-flash, were both rejected live with "no
+// longer available ... use <newer id>" during testing (2026-09). That's a
+// shared-registry staleness issue affecting the whole app's model picker,
+// not just this feature, so it's tracked separately rather than patched here
+// by editing keys/providers.js. This override is a stopgap: it takes the
+// exact id Google's own error message names, and should be removed once the
+// registry is updated. Verify it still works before relying on it — it
+// hasn't been confirmed against a real key, only against what Google's API
+// reported when the previous id failed.
+const GOOGLE_MODEL_OVERRIDE = "gemini-3.6-flash";
+
+function defaultModelId(provider: RepoDocsProvider): string {
+  if (provider === "google") return GOOGLE_MODEL_OVERRIDE;
+  const models = (PROVIDER_MAP[provider]?.models ?? []).filter((m) => m.active);
+  return (
+    (models.find((m) => m.isDefault) ?? models[0])?.id ??
+    FALLBACK_MODEL_IDS[provider]
+  );
+}
+
 const MODEL_IDS: Record<RepoDocsProvider, string> = {
-  google: "gemini-2.0-flash",
-  anthropic: "claude-sonnet-4-6",
-  openai: "gpt-4o-mini",
+  google: defaultModelId("google"),
+  anthropic: defaultModelId("anthropic"),
+  openai: defaultModelId("openai"),
 };
 
 // Env var each provider's key lives in on the server. Note Google's is
