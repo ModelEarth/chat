@@ -3,10 +3,12 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 import type { Vote } from "@/lib/db/drizzle-schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { useDataStream } from "./data-stream-provider";
+import { CollapsibleAnswer } from "./collapsible-answer";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
 import { MessageContent } from "./elements/message";
@@ -45,6 +47,16 @@ const PurePreviewMessage = ({
   requiresScrollPadding: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
+
+  // Same key the Sources sidebar writes. When repos are selected, the normal
+  // chat answer is shown as a labelled, collapsible block so it stacks under
+  // the "From repo docs" panel (see repo-docs-panel.tsx). initializeWithValue
+  // false keeps server and first client render identical (no hydration diff).
+  const [ragSelectedRepos] = useLocalStorage<string[]>("rag-selected-repos", [], {
+    initializeWithValue: false,
+  });
+  const stackAnswer =
+    message.role === "assistant" && ragSelectedRepos.length > 0 && !isLoading;
 
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"
@@ -148,7 +160,9 @@ const PurePreviewMessage = ({
                           : undefined
                       }
                     >
-                      <Response>{sanitizeText(part.text)}</Response>
+                      <CollapsibleAnswer enabled={stackAnswer} label="Chat answer">
+                        <Response>{sanitizeText(part.text)}</Response>
+                      </CollapsibleAnswer>
                     </MessageContent>
                   </div>
                 );
