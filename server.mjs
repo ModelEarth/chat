@@ -33,11 +33,12 @@ import { createServer, request as proxyRequest } from 'node:http'
 import { connect as connectSocket } from 'node:net'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
-import { createReadStream, statSync, existsSync, readFileSync } from 'node:fs'
+import { createReadStream, statSync, existsSync } from 'node:fs'
 import { createPrivateKey, createPublicKey } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import next from 'next'
 import { prepareSanityRuntime } from './sanity/prepare-runtime.mjs'
+import { readEnvFileSetting } from './lib/parse-env-file-setting.mjs'
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 
@@ -48,24 +49,16 @@ const AUTOMATION_DIR = join(WEBROOT, 'automation')
 
 // ── Environment ──────────────────────────────────────────────────────────────
 // Load the .env file automation/paths.yaml's `env_file:` key points at
-// before Next.js boots (mirrors lib/env-loader.ts, and reads the same
-// paths.yaml key as automation/sync-config.sh — one location, not a
-// hardcoded docker/.env). If paths.yaml doesn't exist yet, or has no
-// env_file: set, this is a no-op — run automation/sync-config.sh once, or
-// add env_file: to automation/paths.yaml by hand.
-
-function readEnvFileSetting(pathsYamlFile) {
-  try {
-    const raw = readFileSync(pathsYamlFile, 'utf-8')
-    const match = raw.match(/^\s*env_file:\s*(.+?)\s*$/m)
-    return match ? match[1].replace(/^["']|["']$/g, '') : null
-  } catch {
-    return null
-  }
-}
+// before Next.js boots. Mirrors lib/env-loader.ts exactly — both share
+// lib/parse-env-file-setting.mjs's paths.yaml parsing and the same fallback
+// chain (automation/paths.yaml → local chat/.env → system env) — instead of
+// a hardcoded docker/.env path or a second, hand-kept-in-sync copy of the
+// parsing logic.
 
 try {
   const { config } = await import('dotenv')
+  let loaded = false
+
   if (existsSync(AUTOMATION_DIR)) {
     const pathsYamlFile = join(AUTOMATION_DIR, 'paths.yaml')
     const envFileSetting = readEnvFileSetting(pathsYamlFile)
@@ -75,11 +68,24 @@ try {
       if (existsSync(envPath)) {
         config({ path: envPath })
         console.log(`[env] ${envPath} (via ${pathsYamlFile})`)
+        loaded = true
       } else {
         console.log(`[env] ${pathsYamlFile} points at ${envPath}, but it doesn't exist yet`)
       }
     } else {
       console.log(`[env] No env_file: set in ${pathsYamlFile} yet`)
+    }
+  }
+
+  if (!loaded) {
+    // Mode C fallback: a local .env file next to server.mjs — no
+    // webroot/automation context at all (standalone chat/ checkout).
+    const localEnvPath = join(CHAT_DIR, '.env')
+    if (existsSync(localEnvPath)) {
+      config({ path: localEnvPath })
+      console.log(`[env] ${localEnvPath}`)
+    } else {
+      console.log('[env] No .env file found, using system environment variables')
     }
   }
 } catch { /* dotenv unavailable — rely on process environment */ }

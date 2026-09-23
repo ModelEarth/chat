@@ -39,12 +39,16 @@ def resolve_env_path() -> Path:
     paths_yaml = automation_dir / "paths.yaml"
 
     if paths_yaml.exists():
-        match = re.search(r"^\s*env_file:\s*(.+?)\s*$", paths_yaml.read_text(encoding="utf-8"), re.MULTILINE)
+        match = re.search(r"^\s*env_file:\s*(.+)$", paths_yaml.read_text(encoding="utf-8"), re.MULTILINE)
         if match:
-            env_file_setting = match.group(1).strip("\"'")
-            candidate = automation_dir / env_file_setting
-            if candidate.exists():
-                return candidate
+            # Strip a trailing, whitespace-preceded inline comment (e.g.
+            # "../foo.env  # laptop") before trimming/unquoting - same
+            # parsing as chat/lib/parse-env-file-setting.mjs.
+            env_file_setting = re.sub(r"\s+#.*$", "", match.group(1)).strip().strip("\"'")
+            if env_file_setting:
+                candidate = automation_dir / env_file_setting
+                if candidate.exists():
+                    return candidate
 
     local_env = CHAT_ROOT / ".env.local"
     if local_env.exists():

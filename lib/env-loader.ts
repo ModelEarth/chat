@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { readEnvFileSetting } from './parse-env-file-setting.mjs';
 
 /**
  * Load environment variables from the .env file that
@@ -29,16 +30,6 @@ function findAutomationDir(cwd: string): string | null {
     resolve(cwd, 'automation'),    // Mode A: webroot/ is cwd
   ];
   return candidates.find((dir) => existsSync(dir)) ?? null;
-}
-
-function readEnvFileSetting(pathsYamlFile: string): string | null {
-  try {
-    const raw = readFileSync(pathsYamlFile, 'utf-8');
-    const match = raw.match(/^\s*env_file:\s*(.+?)\s*$/m);
-    return match ? match[1].replace(/^["']|["']$/g, '') : null;
-  } catch {
-    return null;
-  }
 }
 
 export function loadEnvironment() {

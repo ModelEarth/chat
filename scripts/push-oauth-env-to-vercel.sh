@@ -47,7 +47,7 @@ ENVIRONMENT="${2:-$(jq -r '.environment' "$CONFIG_FILE")}"
 if [ -n "$ENV_FILE_REL" ]; then
   # Explicit override in the config file, relative to the config's own dir.
   ENV_FILE="$CONFIG_DIR/$ENV_FILE_REL"
-elif [ -f "$AUTOMATION_DIR/paths.yaml" ] && yaml_value="$(grep -E '^env_file:' "$AUTOMATION_DIR/paths.yaml" | tail -n1 | cut -d ':' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//')" && [ -n "$yaml_value" ]; then
+elif [ -f "$AUTOMATION_DIR/paths.yaml" ] && yaml_value="$(grep -E '^env_file:' "$AUTOMATION_DIR/paths.yaml" | tail -n1 | cut -d ':' -f2- | sed -e 's/[[:space:]]#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//')" && [ -n "$yaml_value" ]; then
   ENV_FILE="$AUTOMATION_DIR/$yaml_value"
 else
   echo "No env file configured: pass one as [config-file]'s \"envFile\", or set env_file: in $AUTOMATION_DIR/paths.yaml (run automation/sync-config.sh once, or add it by hand)." >&2

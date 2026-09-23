@@ -52,7 +52,7 @@ at https://dashboard.clerk.com. Without them the Next.js middleware crashes on s
   pnpm --prefix workflow/comfyui-deploy/web install
 
 # Resolve the local env file via automation/paths.yaml (see automation/README.md):
-ENV_FILE_REL="$(grep -E '^env_file:' automation/paths.yaml 2>/dev/null | tail -n1 | cut -d':' -f2- | xargs)"
+ENV_FILE_REL="$(grep -E '^env_file:' automation/paths.yaml 2>/dev/null | tail -n1 | cut -d':' -f2- | sed -e 's/[[:space:]]#.*$//' | xargs)"
 ENV_FILE="automation/${ENV_FILE_REL}"
 
 # Only start if a env_file: is configured and its Clerk key is set (source it so Clerk vars are in scope):
