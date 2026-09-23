@@ -32,6 +32,7 @@ const PurePreviewMessage = ({
   message,
   vote,
   isLoading,
+  isLast,
   setMessages,
   regenerate,
   isReadonly,
@@ -41,6 +42,7 @@ const PurePreviewMessage = ({
   message: ChatMessage;
   vote: Vote | undefined;
   isLoading: boolean;
+  isLast: boolean;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
@@ -50,13 +52,20 @@ const PurePreviewMessage = ({
 
   // Same key the Sources sidebar writes. When repos are selected, the normal
   // chat answer is shown as a labelled, collapsible block so it stacks under
-  // the "From repo docs" panel (see repo-docs-panel.tsx). initializeWithValue
-  // false keeps server and first client render identical (no hydration diff).
+  // the "From repo docs" panel (see repo-docs-panel.tsx). RepoDocsPanel is
+  // only rendered once, for the latest turn (chat.tsx), so this only applies
+  // to the last message too — otherwise every prior assistant answer in
+  // scrollback gets retroactively collapsed as soon as Sources is enabled.
+  // initializeWithValue false keeps server and first client render identical
+  // (no hydration diff).
   const [ragSelectedRepos] = useLocalStorage<string[]>("rag-selected-repos", [], {
     initializeWithValue: false,
   });
   const stackAnswer =
-    message.role === "assistant" && ragSelectedRepos.length > 0 && !isLoading;
+    message.role === "assistant" &&
+    isLast &&
+    ragSelectedRepos.length > 0 &&
+    !isLoading;
 
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"

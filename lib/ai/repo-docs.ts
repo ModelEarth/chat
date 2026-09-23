@@ -2,6 +2,7 @@ import "server-only";
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { getAvailableRepos } from "@/lib/repos";
 
 /**
  * Pulls README.md / AGENTS.md / CLAUDE.md from the selected repos so they can
@@ -50,9 +51,17 @@ async function readRepoFile(
 /**
  * Fetch README/AGENTS/CLAUDE for each selected repo. Repos with none of the
  * three files simply contribute nothing — never throws on a missing file.
+ *
+ * `repoNames` comes straight from the client request body, so it's checked
+ * against the same allowlist getAvailableRepos() exposes to the RAG repo
+ * picker before any path is built — otherwise a value like
+ * "../../../../etc" would resolve outside the webroot (path traversal).
  */
 export async function getRepoDocs(repoNames: string[]): Promise<RepoDoc[]> {
-  const reads = repoNames.flatMap((repoName) =>
+  const available = new Set((await getAvailableRepos()).map((r) => r.name));
+  const allowedRepoNames = repoNames.filter((name) => available.has(name));
+
+  const reads = allowedRepoNames.flatMap((repoName) =>
     DOC_FILENAMES.map(async (fileName) => {
       const content = await readRepoFile(repoName, fileName);
       return content ? { repoName, fileName, content } : null;

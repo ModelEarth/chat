@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { useLocalStorage } from "usehooks-ts";
 import { unstable_serialize } from "swr/infinite";
@@ -394,6 +394,19 @@ export function Chat({
     }
   }, [status]);
 
+  // Text of the most recent user message, for RepoDocsPanel's query. Memoized
+  // on `messages` so the O(n) reverse/find/join only reruns when the message
+  // list actually changes, not on every token-by-token streaming re-render.
+  const lastUserText = useMemo(() => {
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+    return (
+      lastUserMessage?.parts
+        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join(" ") ?? ""
+    );
+  }, [messages]);
+
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
   const dataParam = searchParams.get("data");
@@ -487,22 +500,7 @@ export function Chat({
           selectedVisibilityType={initialVisibilityType}
         />
 
-        {(() => {
-          const lastUserMessage = [...messages]
-            .reverse()
-            .find((m) => m.role === "user");
-          const lastUserText =
-            lastUserMessage?.parts
-              ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-              .map((p) => p.text)
-              .join(" ") ?? "";
-          return (
-            <RepoDocsPanel
-              query={lastUserText}
-              selectedRepos={ragSelectedReposRef.current}
-            />
-          );
-        })()}
+        <RepoDocsPanel query={lastUserText} selectedRepos={ragSelectedRepos} />
 
         <Messages
           chatId={id}

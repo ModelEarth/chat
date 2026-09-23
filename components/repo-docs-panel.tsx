@@ -1,14 +1,9 @@
 "use client";
 
-import { ChevronDownIcon, FileTextIcon } from "lucide-react";
+import { FileTextIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { CollapsibleAnswer } from "@/components/collapsible-answer";
 import { storage } from "@/lib/storage";
-import { cn } from "@/lib/utils";
 
 /**
  * "Sources selection" feature (per Loren's email): shows answers generated
@@ -33,8 +28,6 @@ const PROVIDER_OPTIONS: { id: Provider; label: string }[] = [
   { id: "anthropic", label: "Anthropic Claude" },
   { id: "openai", label: "OpenAI GPT" },
 ];
-
-const PREVIEW_CHARS = 500;
 
 // Session-only storage, same pattern as hooks/use-repos.ts's repos-cache:
 // per Loren's "a list of multiple files could be saved in the user's browser
@@ -98,10 +91,7 @@ function keyHeaders(providers: Provider[]): Record<string, string> {
 }
 
 function AnswerBlock({ answer }: { answer: Answer }) {
-  const [open, setOpen] = useState(false);
   const text = answer.answer ?? "";
-  const isLong = text.length > PREVIEW_CHARS;
-  const preview = isLong ? `${text.slice(0, PREVIEW_CHARS)}…` : text;
 
   return (
     <div className="rounded-md border border-border/40 bg-muted/10 px-3 py-2">
@@ -113,21 +103,12 @@ function AnswerBlock({ answer }: { answer: Answer }) {
       {answer.error ? (
         <p className="text-xs text-destructive">{answer.error}</p>
       ) : (
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <p className="whitespace-pre-wrap text-sm">{open ? text : preview}</p>
-          {isLong && (
-            <CollapsibleTrigger className="mt-1 flex items-center gap-1 text-xs text-primary">
-              {open ? "Show less" : "More details"}
-              <ChevronDownIcon
-                className={cn("size-3 transition-transform", open && "rotate-180")}
-              />
-            </CollapsibleTrigger>
-          )}
-          {/* The preview/full-text swap above is driven directly by `open`;
-              CollapsibleContent is kept (empty) only so the Trigger stays a
-              valid Collapsible child, consistent with the rest of the app. */}
-          <CollapsibleContent />
-        </Collapsible>
+        // Reuses the same CSS-clip collapsible as the stacked chat answer
+        // (components/message.tsx), instead of a second, character-slicing
+        // preview/expand implementation of the same feature.
+        <CollapsibleAnswer enabled>
+          <p className="whitespace-pre-wrap text-sm">{text}</p>
+        </CollapsibleAnswer>
       )}
     </div>
   );

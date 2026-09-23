@@ -25,7 +25,7 @@ export function CollapsibleAnswer({
   children,
 }: {
   enabled: boolean;
-  label: string;
+  label?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,9 +50,11 @@ export function CollapsibleAnswer({
 
   return (
     <div>
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
+      {label && (
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+      )}
       <div
         className="relative overflow-hidden"
         style={clipped ? { maxHeight: COLLAPSED_PX } : undefined}

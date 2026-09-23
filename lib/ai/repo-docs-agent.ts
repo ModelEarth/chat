@@ -44,9 +44,11 @@ const FALLBACK_MODEL_IDS: Record<RepoDocsProvider, string> = {
 // not just this feature, so it's tracked separately rather than patched here
 // by editing keys/providers.js. This override is a stopgap: it takes the
 // exact id Google's own error message names, and should be removed once the
-// registry is updated. Verify it still works before relying on it — it
-// hasn't been confirmed against a real key, only against what Google's API
-// reported when the previous id failed.
+// registry is updated. It hasn't been confirmed against a real key, only
+// against what Google's API reported when the previous id failed — so it's
+// tried first but is NOT the only candidate: answerWithProvider() falls back
+// through the registry default and FALLBACK_MODEL_IDS if it errors, instead
+// of failing every default "From repo docs" request outright.
 const GOOGLE_MODEL_OVERRIDE = "gemini-3.6-flash";
 
 function defaultModelId(provider: RepoDocsProvider): string {
@@ -56,6 +58,23 @@ function defaultModelId(provider: RepoDocsProvider): string {
     (models.find((m) => m.isDefault) ?? models[0])?.id ??
     FALLBACK_MODEL_IDS[provider]
   );
+}
+
+// Ordered candidate model ids to try for a provider, most-preferred first,
+// with duplicates removed. Only "google" has more than one candidate today —
+// see the GOOGLE_MODEL_OVERRIDE comment above for why.
+function modelIdCandidates(provider: RepoDocsProvider): string[] {
+  const registryDefault = (() => {
+    const models = (PROVIDER_MAP[provider]?.models ?? []).filter((m) => m.active);
+    return (models.find((m) => m.isDefault) ?? models[0])?.id;
+  })();
+
+  const candidates =
+    provider === "google"
+      ? [GOOGLE_MODEL_OVERRIDE, registryDefault, FALLBACK_MODEL_IDS.google]
+      : [registryDefault ?? FALLBACK_MODEL_IDS[provider]];
+
+  return [...new Set(candidates.filter((id): id is string => Boolean(id)))];
 }
 
 const MODEL_IDS: Record<RepoDocsProvider, string> = {
@@ -75,18 +94,22 @@ const SERVER_KEY_ENV: Record<RepoDocsProvider, string> = {
 
 export type RepoDocsApiKeys = Partial<Record<RepoDocsProvider, string>>;
 
-function getModel(provider: RepoDocsProvider, apiKeys?: RepoDocsApiKeys) {
+function getModel(
+  provider: RepoDocsProvider,
+  modelId: string,
+  apiKeys?: RepoDocsApiKeys
+) {
   // A key supplied with the request (browser key manager) wins, matching how
   // the main chat route treats keys; otherwise fall back to the server env.
   const apiKey = apiKeys?.[provider] || process.env[SERVER_KEY_ENV[provider]];
   switch (provider) {
     case "anthropic":
-      return createAnthropic({ apiKey })(MODEL_IDS.anthropic);
+      return createAnthropic({ apiKey })(modelId);
     case "openai":
-      return createOpenAI({ apiKey })(MODEL_IDS.openai);
+      return createOpenAI({ apiKey })(modelId);
     case "google":
     default:
-      return createGoogleGenerativeAI({ apiKey })(MODEL_IDS.google);
+      return createGoogleGenerativeAI({ apiKey })(modelId);
   }
 }
 
@@ -95,19 +118,31 @@ async function answerWithProvider(
   prompt: string,
   apiKeys?: RepoDocsApiKeys
 ): Promise<RepoDocsAnswer> {
-  try {
-    const { text } = await generateText({
-      model: getModel(provider, apiKeys),
-      prompt,
-    });
-    return { provider, modelId: MODEL_IDS[provider], answer: text };
-  } catch (error) {
-    return {
-      provider,
-      modelId: MODEL_IDS[provider],
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  const candidates = modelIdCandidates(provider);
+  let lastError: unknown;
+
+  for (const modelId of candidates) {
+    try {
+      const { text } = await generateText({
+        model: getModel(provider, modelId, apiKeys),
+        prompt,
+      });
+      return { provider, modelId, answer: text };
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  const lastMessage =
+    lastError instanceof Error ? lastError.message : "Unknown error";
+  return {
+    provider,
+    modelId: MODEL_IDS[provider],
+    error:
+      candidates.length > 1
+        ? `${lastMessage} (tried: ${candidates.join(", ")})`
+        : lastMessage,
+  };
 }
 
 /**
