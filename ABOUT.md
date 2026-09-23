@@ -1,4 +1,4 @@
-# CodeChat
+# Earthscape Chat
 
 A multimodal AI chat application with advanced agent orchestration, built on the [Vercel AI Chatbot](https://vercel.com/templates/next.js/chatbot) starter and significantly extended for the [Model.earth](https://model.earth) open-source community.
 
