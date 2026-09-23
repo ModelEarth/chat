@@ -8,7 +8,7 @@ import { isPlaceholderValue } from "@/lib/auth/env-placeholder";
 export type DbStatus = "ok" | "not-configured" | "unreachable";
 
 export async function getDbStatus(): Promise<DbStatus> {
-  // A POSTGRES_URL that's still the unfilled docker/.env.example placeholder
+  // A POSTGRES_URL that's still the unfilled automation/.env.example placeholder
   // is really "not configured" — attempting a real connection to it would
   // just hang on a fake host until connect_timeout, and misreport the more
   // actionable "add POSTGRES_URL" case as a Supabase-pause "unreachable" one.

@@ -4,7 +4,7 @@
 -- After running, get the app_user connection string from:
 --   Project Settings → Database → Connection pooling → Transaction mode (port 6543)
 --   Change the username from "postgres" to "app_user" in that URL.
---   Set POSTGRES_URL in docker/.env to that connection string.
+--   Set POSTGRES_URL in your local env file (see automation/paths.yaml) to that connection string.
 
 -- 1. Create the role — generate a strong password with no special characters:
 --    openssl rand -hex 32

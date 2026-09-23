@@ -7,9 +7,9 @@ Two related additions to the `/auth` sign-in page (`chat/auth/` static assets, m
 **Project 1 — Gray out social buttons without a configured key, plus a local key-transfer panel**
 - All social login buttons (Google, GitHub, LinkedIn, Microsoft, Discord, Facebook) render grayed out/disabled when that provider's OAuth client id/secret pair isn't configured. Facebook reportedly did this correctly before — treat that as the reference behavior and generalize it to all providers rather than reinventing it.
 - Key presence must be readable in both environments without exposing secret values to the client:
-  - Localhost: presence is derived from `docker/.env`
+  - Localhost: presence is derived from the local env file (see `automation/paths.yaml`)
   - Vercel: presence is derived from the environment variables set in the Vercel project
-- Add a **localhost-only** panel (never rendered on Vercel/production) that lists every social-login env var name with its value blurred (CSS blur, not just `type=password` — never revealed by toggle) and a copy-to-clipboard icon per row. Purpose: let the user quickly copy each value out of `docker/.env` and paste it into Vercel's dashboard "Environment Variables" bulk-paste UI. No textarea — just a list of rows (name + blurred value + copy icon).
+- Add a **localhost-only** panel (never rendered on Vercel/production) that lists every social-login env var name with its value blurred (CSS blur, not just `type=password` — never revealed by toggle) and a copy-to-clipboard icon per row. Purpose: let the user quickly copy each value out of the local env file and paste it into Vercel's dashboard "Environment Variables" bulk-paste UI. No textarea — just a list of rows (name + blurred value + copy icon).
 
 **Project 2 — Reuse the Supabase username/password login under the social buttons**
 - Reuse the existing Supabase `/login`-style email/password fields + sign-in button, adding them to `/auth` beneath the social login buttons.
@@ -26,7 +26,7 @@ Do not commit automatically while implementing this plan.
 - Auth backend is better-auth: `betterauth/auth.ts` (full, DB-backed), `betterauth/auth-edge.ts` (stateless, no DB, used by edge middleware), `betterauth/client.ts` (React client).
 - OAuth provider credential env vars (each provider auto-enables only when **both** are set) — six pairs: `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `LINKEDIN_CLIENT_ID`/`SECRET`, `MICROSOFT_CLIENT_ID`/`SECRET`, `DISCORD_CLIENT_ID`/`SECRET`, `FACEBOOK_CLIENT_ID`/`SECRET`.
 - `POSTGRES_URL` is optional and backend-agnostic — Supabase is "one supported database, not the only one." No-DB mode already exists (`AUTH_MODE=stateless` / no `POSTGRES_URL`) and degrades gracefully.
-- Non-secret settings belong in `docker/webroot.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in `docker/.env` locally / Vercel env vars in production.
+- Non-secret settings belong in `docker/webroot.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) / Vercel env vars in production.
 - There's a separate, unrelated key system for AI provider keys (browser-encrypted `localStorage['settings_api-keys']`, see `team/key/PLAN.md`) — **not** to be conflated with these server-side OAuth/DB secrets. Project 1's "copy keys to Vercel" panel is about *server* env vars, not browser-stored AI keys.
 
 ## Current-code findings (research complete)
@@ -45,11 +45,11 @@ Do not commit automatically while implementing this plan.
 
 **Server already computes real per-provider "is configured" booleans — just never exposes them to the client:**
 - `chat/lib/auth/instance.ts:99-131` — `socialProviders` config for google/linkedin/github/microsoft/discord/facebook, each `enabled: !!(process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET)`. This is the single source of truth to reuse — no new detection logic needed, just pipe it to the client. Since `app/auth/page.tsx` is itself a **server component**, it can read/reuse these booleans directly at render time and pass them as a prop to `SocialLoginButtons` — no new API route needed, and no risk of leaking values since only booleans cross the server/client boundary.
-- This also transparently satisfies "localhost reads docker/.env, Vercel reads its own env vars" — both just populate `process.env` before this code runs; no environment branching needed for detection itself (only for whether Phase 3's panel renders at all).
+- This also transparently satisfies "localhost reads its local env file, Vercel reads its own env vars" — both just populate `process.env` before this code runs; no environment branching needed for detection itself (only for whether Phase 3's panel renders at all).
 
-**Bug found — `docker/.env.example` doesn't match what the code reads for 2 of the 6 providers:**
+**Bug found — `automation/.env.example` doesn't match what the code reads for 2 of the 6 providers:**
 - Code (`lib/auth/instance.ts`) reads `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET`.
-- `docker/.env.example` instead defines `DISCORD_BOT_TOKEN` (unrelated purpose) and `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` (wrong names) — lines 109, 142-143.
+- `automation/.env.example` instead defines `DISCORD_BOT_TOKEN` (unrelated purpose) and `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` (wrong names) — lines 109, 142-143.
 - `chat/auth/oauth-setup.md:145-171` already documents the *correct* full set including `DISCORD_CLIENT_ID/SECRET` and `FACEBOOK_CLIENT_ID/SECRET` — `.env.example` is just stale relative to both the code and this doc.
 - **Practical effect: Facebook (and Discord OAuth, as opposed to the bot-token use) can never actually show as "configured" for a user who only follows `.env.example`.** Worth fixing as part of Phase 1 regardless of the UI work.
 
@@ -60,7 +60,7 @@ Do not commit automatically while implementing this plan.
   - **Directly reusable gray-out pattern** (line 192): `<div className={dbUnavailable ? "pointer-events-none select-none opacity-40" : ""}>` wrapping the whole form — container-level graying, not per-field.
   - `<AuthForm>` (from `chat/components/auth-form.tsx`) + `<SubmitButton disabled={isSubmitting || loading || dbUnavailable}>` (lines 192-210).
   - Important: despite the Supabase-configured check gating the UI, actual sign-in calls go through **Better Auth** (`lib/auth/hooks.ts` → `lib/auth/client.ts`), not Supabase auth directly — Supabase here is only used as the underlying Postgres reachability signal. This already matches the "swappable Postgres backend" requirement structurally; `isSupabaseConfigured` just needs to become a generic `isDatabaseConfigured`/reachability check so Neon etc. work the same way.
-  - `isVercel = !!process.env.NEXT_PUBLIC_VERCEL_URL` (line 18) is already used to vary the setup-instructions copy in the warning banner (docker/.env vs Vercel env vars) — same pattern Project 1 needs.
+  - `isVercel = !!process.env.NEXT_PUBLIC_VERCEL_URL` (line 18) is already used to vary the setup-instructions copy in the warning banner (local env file vs Vercel env vars) — same pattern Project 1 needs.
   - There's also a related `isDbConfigured` export from `chat/lib/db/queries/base` (imported at `lib/auth/instance.ts:3`) worth checking as a possibly-more-generic existing check before introducing a new one.
 
 **Localhost/dev-only gating pattern to reuse for Phase 3's panel:**
@@ -74,7 +74,7 @@ Do not commit automatically while implementing this plan.
 
 | Phase | Status |
 |---|---|
-| Phase 0 — Fix `docker/.env.example` naming bug | Complete |
+| Phase 0 — Fix `automation/.env.example` naming bug | Complete |
 | Phase 1 — Server: expose provider-key presence (OAuth + DB) without leaking values | Complete |
 | Phase 2 — Client: gray out unconfigured social buttons on `/auth` | Complete |
 | Phase 3 — Localhost-only "copy keys to Vercel" panel | Complete (placeholder-filtered, bulk-copy added) |
@@ -85,13 +85,13 @@ Do not commit automatically while implementing this plan.
 
 ---
 
-## Phase 0 — Fix `docker/.env.example` naming bug
+## Phase 0 — Fix `automation/.env.example` naming bug
 
-Add correct `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` placeholders (matching what `lib/auth/instance.ts` actually reads and what `chat/auth/oauth-setup.md` already documents) to `docker/.env.example`. Leave `DISCORD_BOT_TOKEN` alone (different purpose). Ask the user before touching `docker/.env` itself, per `chat/AGENTS.md`'s env-var-doc policy.
+Add correct `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` placeholders (matching what `lib/auth/instance.ts` actually reads and what `chat/auth/oauth-setup.md` already documents) to `automation/.env.example`. Leave `DISCORD_BOT_TOKEN` alone (different purpose). Ask the user before touching `docker/.env` itself, per `chat/AGENTS.md`'s env-var-doc policy.
 
 ## Phase 1 — Server: pipe existing provider-enabled booleans to `SocialLoginButtons`
 
-`chat/app/auth/page.tsx` is a server component — reuse the `enabled: !!(CLIENT_ID && CLIENT_SECRET)` booleans already computed in `lib/auth/instance.ts:99-131` (import/derive the same values) and pass as a `configuredProviders` prop to `<SocialLoginButtons />`. No new API route needed — only booleans cross the server/client boundary, computed fresh on every request so Vercel env vars and local `docker/.env` are both picked up automatically without branching.
+`chat/app/auth/page.tsx` is a server component — reuse the `enabled: !!(CLIENT_ID && CLIENT_SECRET)` booleans already computed in `lib/auth/instance.ts:99-131` (import/derive the same values) and pass as a `configuredProviders` prop to `<SocialLoginButtons />`. No new API route needed — only booleans cross the server/client boundary, computed fresh on every request so Vercel env vars and the local env file are both picked up automatically without branching.
 
 ## Phase 2 — Client: add Facebook + gray out unconfigured social buttons
 
@@ -124,7 +124,7 @@ Replace (or wrap) `isSupabaseConfigured` with a generic reachability check that 
 
 1. **Panel location (Phase 3):** on `/auth` itself, below the login forms, rendered only when localhost is detected.
 2. **Grayed-button click behavior (Phase 2):** fully disabled, no click handler — no inline message, no `alert()`.
-3. **`docker/.env.example` fix (Phase 0):** proceeding — it's an additive placeholder fix, not a change to real secrets.
+3. **`automation/.env.example` fix (Phase 0):** proceeding — it's an additive placeholder fix, not a change to real secrets.
 4. **`isDbConfigured` (`chat/lib/db/queries/base.ts:7`)** — confirmed already generic: `!!process.env.POSTGRES_URL`, works for Supabase/Neon/any Postgres URL. It's presence, not reachability, though — Phase 5 still needs an actual connectivity check (e.g. a cheap `SELECT 1`), reusing the existing `db`/`getDb()` export at lines 19-24 rather than a Supabase-specific client.
 
 ---
@@ -133,7 +133,7 @@ Replace (or wrap) `isSupabaseConfigured` with a generic reachability check that 
 
 | File | Action |
 |---|---|
-| `docker/.env.example` | Added correct `DISCORD_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET` placeholders |
+| `automation/.env.example` | Added correct `DISCORD_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET` placeholders |
 | `docker/.env` | Renamed `FACEBOOK_APP_ID`→`FACEBOOK_CLIENT_ID`, `FACEBOOK_APP_SECRET`→`FACEBOOK_CLIENT_SECRET`, preserving existing values (user-confirmed) |
 | `chat/lib/auth/social-providers.ts` | **New** — leaf module, single source of truth for the 6 provider env-var-name pairs + `isSocialProviderConfigured`/`getConfiguredSocialProviders`; configured check now also rejects placeholder-valued credentials |
 | `chat/lib/auth/env-placeholder.ts` | **New** — shared `isPlaceholderValue(varName, value)`, used by both the button-graying check and the copy panel so they agree on what counts as "not really set" |
@@ -168,7 +168,7 @@ The original binary `dbUnavailable`/`dbUnavailableMessage` pair only supported o
 
 **New shared model — `DbStatus = "ok" | "not-configured" | "unreachable"`:**
 - `chat/lib/auth/db-status.ts` (server-only) — `getDbStatus()`. Treats a `POSTGRES_URL` that's still the unfilled `.env.example` placeholder as `"not-configured"` (reusing `isPlaceholderValue` from `env-placeholder.ts`) rather than attempting — and hanging on — a real connection to a fake host; only genuinely-set-but-down URLs reach the real `isDbReachable()` check and report `"unreachable"`.
-- `chat/components/db-status-banner.tsx` (client) — `DbStatusBanner` + exported `getDbStatusMessage()`. Single place for both message text and which fix-it link to show: `"not-configured"` → "To activate sign up, add POSTGRES_URL to docker/.env." (or the Vercel variant) linking to `DEPLOYMENT_GUIDE.md`'s Supabase setup steps; `"unreachable"` → "Can't reach the database. If you're on Supabase's free tier, projects pause after about 14 days of inactivity — restart it from your Supabase dashboard." linking to `supabase.com/dashboard/projects`.
+- `chat/components/db-status-banner.tsx` (client) — `DbStatusBanner` + exported `getDbStatusMessage()`. Single place for both message text and which fix-it link to show: `"not-configured"` → "To activate sign up, add POSTGRES_URL to your local env file (see automation/paths.yaml)." (or the Vercel variant) linking to `DEPLOYMENT_GUIDE.md`'s Supabase setup steps; `"unreachable"` → "Can't reach the database. If you're on Supabase's free tier, projects pause after about 14 days of inactivity — restart it from your Supabase dashboard." linking to `supabase.com/dashboard/projects`.
 - `chat/app/api/auth/db-status/route.ts` — booleans-equivalent, no secret exposure, no gating needed (unlike `local-env-values`).
 - `chat/lib/auth/use-db-status.ts` — client hook wrapping the API fetch, for `/login` and `/register` (both `"use client"` pages that can't call the server-only `getDbStatus()` directly). Defaults to `"ok"` while loading to avoid a false-positive flash.
 - `chat/app/auth/page.tsx` — already a server component, calls `getDbStatus()` directly, no API round-trip needed.

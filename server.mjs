@@ -33,7 +33,7 @@ import { createServer, request as proxyRequest } from 'node:http'
 import { connect as connectSocket } from 'node:net'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
-import { createReadStream, statSync, existsSync } from 'node:fs'
+import { createReadStream, statSync, existsSync, readFileSync } from 'node:fs'
 import { createPrivateKey, createPublicKey } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import next from 'next'
@@ -44,16 +44,43 @@ import { prepareSanityRuntime } from './sanity/prepare-runtime.mjs'
 const CHAT_DIR = dirname(fileURLToPath(import.meta.url))  // .../webroot/chat
 const WEBROOT  = resolve(CHAT_DIR, '..')                   // .../webroot
 const SANITY_SOURCE_DIR = join(WEBROOT, 'sanity')
+const AUTOMATION_DIR = join(WEBROOT, 'automation')
 
 // ── Environment ──────────────────────────────────────────────────────────────
-// Load docker/.env before Next.js boots (mirrors lib/env-loader.ts).
+// Load the .env file automation/paths.yaml's `env_file:` key points at
+// before Next.js boots (mirrors lib/env-loader.ts, and reads the same
+// paths.yaml key as automation/sync-config.sh — one location, not a
+// hardcoded docker/.env). If paths.yaml doesn't exist yet, or has no
+// env_file: set, this is a no-op — run automation/sync-config.sh once, or
+// add env_file: to automation/paths.yaml by hand.
+
+function readEnvFileSetting(pathsYamlFile) {
+  try {
+    const raw = readFileSync(pathsYamlFile, 'utf-8')
+    const match = raw.match(/^\s*env_file:\s*(.+?)\s*$/m)
+    return match ? match[1].replace(/^["']|["']$/g, '') : null
+  } catch {
+    return null
+  }
+}
 
 try {
   const { config } = await import('dotenv')
-  const envPath = join(WEBROOT, 'docker', '.env')
-  if (existsSync(envPath)) {
-    config({ path: envPath })
-    console.log(`[env] ${envPath}`)
+  if (existsSync(AUTOMATION_DIR)) {
+    const pathsYamlFile = join(AUTOMATION_DIR, 'paths.yaml')
+    const envFileSetting = readEnvFileSetting(pathsYamlFile)
+
+    if (envFileSetting) {
+      const envPath = resolve(AUTOMATION_DIR, envFileSetting)
+      if (existsSync(envPath)) {
+        config({ path: envPath })
+        console.log(`[env] ${envPath} (via ${pathsYamlFile})`)
+      } else {
+        console.log(`[env] ${pathsYamlFile} points at ${envPath}, but it doesn't exist yet`)
+      }
+    } else {
+      console.log(`[env] No env_file: set in ${pathsYamlFile} yet`)
+    }
   }
 } catch { /* dotenv unavailable — rely on process environment */ }
 
@@ -472,7 +499,7 @@ function renderSanityFallbackPage() {
       ${missingVars
         ? `<ul>${missingVars}</ul>`
         : '<p>No required Sanity env vars are missing. If startup still fails, check whether the values are valid.</p>'}
-      <p>Expected local source: <code>docker/.env</code></p>
+      <p>Expected local source: the env file at the path in <code>automation/paths.yaml</code></p>
     </div>
     <div class="panel">
       <h2>Expected Values</h2>

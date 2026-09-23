@@ -76,7 +76,7 @@ Set `REQUIRE_AUTH=true` in env vars to require login for the entire site (middle
 
 `BETTER_AUTH_SECRET` is required before any provider will work.
 
-**Local** (`docker/.env`): any strong random value works. Sessions stay local
+**Local** (your local env file, see `automation/paths.yaml`): any strong random value works. Sessions stay local
 because `api_url_development` in `docker/webroot.yaml` always points to
 `localhost:3700`, never to Vercel.
 
@@ -103,5 +103,5 @@ See [oauth-setup.md](oauth-setup.md) for the full provider credential variable l
 ## Adding a provider
 
 1. Register the OAuth app and get credentials — see [oauth-setup.md](oauth-setup.md).
-2. Add `PROVIDER_CLIENT_ID` and `PROVIDER_CLIENT_SECRET` to `docker/.env`.
+2. Add `PROVIDER_CLIENT_ID` and `PROVIDER_CLIENT_SECRET` to your local env file (see `automation/paths.yaml`).
 3. The provider auto-enables in `lib/auth/instance.ts` when both vars are present.

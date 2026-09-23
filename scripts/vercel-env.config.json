@@ -1,6 +1,5 @@
 {
   "environment": "production",
-  "envFile": "../../docker/.env",
   "vars": [
     { "source": "GOOGLE_CLIENT_ID", "target": "GOOGLE_CLIENT_ID" },
     { "source": "GOOGLE_CLIENT_SECRET", "target": "GOOGLE_CLIENT_SECRET" },

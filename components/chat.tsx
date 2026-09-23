@@ -535,8 +535,9 @@ export function Chat({
           <div className="mx-auto w-full max-w-4xl px-[26px] pb-2 md:px-[34px]">
             <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200">
               <span className="font-medium">Pinecone key unauthorized.</span>{" "}
-              The <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">PINECONE_API_KEY</code> in{" "}
-              <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">docker/.env</code>{" "}
+              The <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">PINECONE_API_KEY</code> in
+              your local env file (see{" "}
+              <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">automation/paths.yaml</code>)
               is not authorized for this index. Copy the key from{" "}
               <a
                 href="https://app.pinecone.io"
@@ -546,7 +547,7 @@ export function Chat({
               >
                 app.pinecone.io
               </a>{" "}
-              → API Keys, update <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">docker/.env</code>, and restart the server.
+              → API Keys, update it, and restart the server.
             </div>
           </div>
         )}
@@ -565,8 +566,10 @@ export function Chat({
               >
                 app.pinecone.io
               </a>
-              , add <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">PINECONE_INDEX_HOST</code> to{" "}
-              <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">docker/.env</code>, then run{" "}
+              , add <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">PINECONE_INDEX_HOST</code> to
+              your local env file (see{" "}
+              <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">automation/paths.yaml</code>),
+              then run{" "}
               <code className="rounded bg-amber-100 px-0.5 dark:bg-amber-900">python chat/ingestion/vector_db_sync.py --reindex-all</code>{" "}
               to populate it with your repo vectors.
             </div>

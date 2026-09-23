@@ -6,14 +6,15 @@ import { resolve } from "node:path";
 // "not really configured" — a var can be *present* but still just be the
 // unfilled example text.
 
-// Same probing order as lib/env-loader.ts, targeting .env.example instead of
-// .env. Cached after first read since this can be called per-request.
+// Same probing order as lib/env-loader.ts, targeting automation/.env.example
+// instead of a live env file. Cached after first read since this can be
+// called per-request.
 let cachedExampleValues: Record<string, string> | null = null;
 
 function loadExampleValues(): Record<string, string> {
   if (cachedExampleValues) return cachedExampleValues;
   const cwd = process.cwd();
-  const candidates = [resolve(cwd, "../docker/.env.example"), resolve(cwd, "docker/.env.example")];
+  const candidates = [resolve(cwd, "../automation/.env.example"), resolve(cwd, "automation/.env.example")];
   const examplePath = candidates.find((p) => existsSync(p));
   const values: Record<string, string> = {};
   if (examplePath) {
@@ -26,7 +27,7 @@ function loadExampleValues(): Record<string, string> {
   return values;
 }
 
-// Catches placeholder text that predates the current docker/.env.example
+// Catches placeholder text that predates the current automation/.env.example
 // wording too (e.g. an older "your-facebook-app-id" left over from before
 // the example file's own placeholder text was updated) — a backstop for the
 // exact-match check, not a replacement for it.

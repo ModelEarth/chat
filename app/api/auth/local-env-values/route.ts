@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { isPlaceholderValue } from "@/lib/auth/env-placeholder";
 import { SOCIAL_PROVIDER_ENV_VARS } from "@/lib/auth/social-providers";
 
-// Serves real secret values so a developer can copy docker/.env into Vercel's
-// dashboard without ever seeing them rendered readably on screen (client
+// Serves real secret values so a developer can copy their local env file
+// (the one automation/paths.yaml points at) into Vercel's dashboard without
+// ever seeing them rendered readably on screen (client
 // blurs them; see components/local-env-key-panel.tsx). Double-gated: refuses
 // to serve anything unless the request is actually local AND this isn't a
 // Vercel deployment — never rely on the client hiding the panel alone.

@@ -74,9 +74,9 @@ pnpm install
 
 The application supports two configuration modes:
 
-**Option A: Shared Docker Configuration (Recommended for webroot setup)**
+**Option A: Shared Configuration (Recommended for webroot setup)**
 
-If you're using the [Model.Earth webroot structure](https://model.earth/webroot/), the application will automatically load environment variables from `../webroot/docker/.env`. This allows centralized configuration across multiple projects.
+If you're using the [Model.Earth webroot structure](https://model.earth/webroot/), the application will automatically load environment variables from the local env file that `../automation/paths.yaml`'s `env_file:` key points at (see `automation/README.md` for how that's set). This allows centralized configuration across multiple projects.
 
 **Option B: Local Configuration**
 
@@ -91,8 +91,8 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 The application will automatically:
-1. Check for `../webroot/docker/.env` first
-2. Fall back to local `.env` if docker/.env doesn't exist
+1. Resolve `../automation/paths.yaml`'s `env_file:` key and load that file first
+2. Fall back to local `.env` if that file doesn't exist
 3. Use system environment variables if no .env file is found
 
 #### 4. Run Database Migrations

@@ -108,9 +108,10 @@ export function EnvKeyPanel({ apiPath, title, description, copyAllLabel }: EnvKe
   );
 }
 
-// Lets a developer copy auth secrets out of docker/.env straight into
-// Vercel's dashboard without the value ever being rendered readably on
-// screen. The server route (api/auth/local-env-values) refuses to serve
+// Lets a developer copy auth secrets out of their local env file (the one
+// automation/paths.yaml points at) straight into Vercel's dashboard without
+// the value ever being rendered readably on screen. The server route
+// (api/auth/local-env-values) refuses to serve
 // values off-localhost/off-Vercel-detection regardless of this component
 // rendering — this client-side check is a second, redundant guard, not
 // the source of truth.

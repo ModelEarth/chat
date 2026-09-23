@@ -11,7 +11,7 @@ export function getDbStatusMessage(status: DbStatus, isVercel: boolean): string 
   if (status === "not-configured") {
     return isVercel
       ? "Activate by adding POSTGRES_URL to your Vercel environment variables."
-      : "Activate by adding POSTGRES_URL to docker/.env.";
+      : "Activate by adding POSTGRES_URL to your local env file (see automation/paths.yaml).";
   }
   if (status === "unreachable") {
     return "Can't reach the database. If you're on Supabase's free tier, projects pause after about 14 days of inactivity — restart it from your Supabase dashboard.";

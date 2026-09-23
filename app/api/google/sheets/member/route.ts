@@ -38,7 +38,7 @@ async function handleSave(request: Request) {
       case "no_credentials":
         return corsErrorJson(400, {
           success: false,
-          error: "GOOGLE_SERVICE_KEY / GOOGLE_SERVICE_KEY_JSON not set or invalid in docker/.env",
+          error: "GOOGLE_SERVICE_KEY / GOOGLE_SERVICE_KEY_JSON not set or invalid in the local env file (see automation/paths.yaml)",
           email,
         });
       case "saved":

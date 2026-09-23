@@ -93,7 +93,7 @@ See [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) for full setup instructions inc
 
 ## Environment Variables
 
-See [`docker/.env`](../docker/.env) for a full reference. Minimum required:
+See [`automation/.env.example`](../automation/.env.example) for a full reference of the variables. Your actual values live in the local env file that [`automation/paths.yaml`](../automation/paths.yaml) points at (see `automation/README.md`). Minimum required:
 
 ```
 BETTER_AUTH_SECRET=          # 32+ char random string

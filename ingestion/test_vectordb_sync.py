@@ -13,6 +13,7 @@ Run (from repo root): python chat/ingestion/test_vectordb_sync.py
 """
 
 import os
+import re
 import sys
 import time
 import uuid
@@ -27,12 +28,38 @@ REPO_ROOT = CHAT_ROOT.parent  # webroot/
 sys.path.insert(0, str(THIS_DIR))
 import vector_db_sync  # type: ignore
 
+def resolve_env_path() -> Path:
+    """Find the local env file the same way lib/env-loader.ts does: read
+    automation/paths.yaml's `env_file:` key instead of a hardcoded
+    docker/.env path. If paths.yaml doesn't exist yet, or has no env_file:
+    set, this is a no-op — run automation/sync-config.sh once, or add it by
+    hand. Falls back further to a chat/.env.local or chat/.env file for a
+    standalone chat/ checkout with no automation/ folder."""
+    automation_dir = REPO_ROOT / "automation"
+    paths_yaml = automation_dir / "paths.yaml"
+
+    if paths_yaml.exists():
+        match = re.search(r"^\s*env_file:\s*(.+?)\s*$", paths_yaml.read_text(encoding="utf-8"), re.MULTILINE)
+        if match:
+            env_file_setting = match.group(1).strip("\"'")
+            candidate = automation_dir / env_file_setting
+            if candidate.exists():
+                return candidate
+
+    local_env = CHAT_ROOT / ".env.local"
+    if local_env.exists():
+        return local_env
+    return CHAT_ROOT / ".env"
+
 
 def ensure_env() -> Tuple[str, str, str]:
     api = os.getenv("PINECONE_API_KEY")
     voy = os.getenv("VOYAGE_API_KEY")
     if not api or not voy:
-        raise SystemExit("PINECONE_API_KEY and VOYAGE_API_KEY must be set in docker/.env, chat/.env, or environment")
+        raise SystemExit(
+            "PINECONE_API_KEY and VOYAGE_API_KEY must be set in the local env file "
+            "(see automation/paths.yaml), chat/.env, or environment"
+        )
 
     # Generate unique repo_name for metadata tagging (not used as namespace anymore)
     repo_name = f"vector-sync-test-{uuid.uuid4().hex[:8]}"
@@ -138,10 +165,9 @@ def make_markdown(label: str, variant: str, section_count: int = 8) -> str:
 
 
 def main() -> None:
-    # Load local env file (prefer .env.local for secrets)
-    env_path = CHAT_ROOT / ".env.local"
-    if not env_path.exists():
-        env_path = CHAT_ROOT / ".env"
+    # Load the local env file — the one automation/paths.yaml points at, with
+    # chat/.env.local / chat/.env as fallbacks (see resolve_env_path()).
+    env_path = resolve_env_path()
     load_dotenv(dotenv_path=str(env_path), override=True)
 
     # vector_db_sync expects paths relative to repo root (like `chat/...`).

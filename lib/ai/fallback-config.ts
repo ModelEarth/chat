@@ -42,7 +42,7 @@ export const FALLBACK_DB_OFFLINE_STATUS = {
   message: "The model configuration database is unreachable.",
   steps: [
     "Create and add a Supabase key, or have your site admin log in to supabase.com and restore the paused project.",
-    "Verify that POSTGRES_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY in docker/.env point to the correct project.",
+    "Verify that POSTGRES_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY in your local env file (see automation/paths.yaml) point to the correct project.",
     "Restart the server: kill $(lsof -ti:8888) && node chat/server.mjs",
   ],
 };
@@ -52,7 +52,7 @@ export const FALLBACK_DB_OFFLINE_STATUS_LOCALHOST = {
   message: "The model configuration database is unreachable.",
   steps: [
     "Create and add a Supabase or Neon database key, or have a teammate provide a test key.",
-    "Verify that POSTGRES_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY in docker/.env point to the correct project.",
+    "Verify that POSTGRES_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY in your local env file (see automation/paths.yaml) point to the correct project.",
     "Restart the server: kill $(lsof -ti:8888) && node chat/server.mjs",
   ],
 };

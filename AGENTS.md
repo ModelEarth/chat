@@ -41,7 +41,8 @@ Then report the URLs from the log output.
 ### Workflow repo detection
 
 If `workflow/comfyui-deploy/web/package.json` exists AND `CLERK_SECRET_KEY` is set in
-`docker/.env`, also start the ComfyUI Deploy dashboard on port 3001 as part of `start chat`.
+the local env file (the one `automation/paths.yaml` points at), also start the ComfyUI
+Deploy dashboard on port 3001 as part of `start chat`.
 Requires both `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — get them free
 at https://dashboard.clerk.com. Without them the Next.js middleware crashes on startup.
 
@@ -50,10 +51,14 @@ at https://dashboard.clerk.com. Without them the Next.js middleware crashes on s
 [ ! -d workflow/comfyui-deploy/web/node_modules ] && \
   pnpm --prefix workflow/comfyui-deploy/web install
 
-# Only start if Clerk key is configured (source docker/.env so Clerk vars are in scope):
-grep -q "CLERK_SECRET_KEY=sk_" docker/.env 2>/dev/null && \
+# Resolve the local env file via automation/paths.yaml (see automation/README.md):
+ENV_FILE_REL="$(grep -E '^env_file:' automation/paths.yaml 2>/dev/null | tail -n1 | cut -d':' -f2- | xargs)"
+ENV_FILE="automation/${ENV_FILE_REL}"
+
+# Only start if a env_file: is configured and its Clerk key is set (source it so Clerk vars are in scope):
+[ -n "$ENV_FILE_REL" ] && grep -q "CLERK_SECRET_KEY=sk_" "$ENV_FILE" 2>/dev/null && \
   { lsof -ti:3001 > /dev/null 2>&1 || \
-    nohup bash -c 'set -a; source docker/.env; set +a; PORT=3001 pnpm --prefix workflow/comfyui-deploy/web dev' \
+    nohup bash -c "set -a; source \"$ENV_FILE\"; set +a; PORT=3001 pnpm --prefix workflow/comfyui-deploy/web dev" \
       > /tmp/comfydeploy-dev.log 2>&1 &; }
 ```
 
@@ -81,7 +86,7 @@ PORT=8887 node chat/server.mjs     # → replaces the Python server
 pnpm --prefix chat dev:webroot
 ```
 
-The server loads `docker/.env` automatically from the webroot root before booting Next.js.
+The server loads the local env file — the one `automation/paths.yaml`'s `env_file:` key points at, resolved from the webroot root — automatically before booting Next.js. See "Environment Variables" below.
 When `sanity/` is present, it prepares a derived runtime copy outside the submodule, starts the Sanity Next.js dev server on an internal port, and mounts it at `/sanity` on the same public host.
 
 #### URL layout on the unified server
@@ -116,7 +121,7 @@ For working exclusively on the Next.js app with Turbopack HMR:
 cd chat && pnpm dev    # port 3700, Turbopack, no static repo serving
 ```
 
-`lib/env-loader.ts` finds `docker/.env` at `../docker/.env` relative to `chat/`. No separate `.env` file inside `chat/` is needed.
+`lib/env-loader.ts` finds the local env file by resolving `automation/paths.yaml` at `../automation/paths.yaml` relative to `chat/`. No separate `.env` file inside `chat/` is needed.
 
 ### Auth backends & no-database mode
 
@@ -186,7 +191,9 @@ Check if already running: `lsof -ti:3700`
 
 ## Environment Variables
 
-Loaded from `docker/.env` (relative to the webroot root, not this folder). Key variables:
+Loaded from the local env file that `automation/paths.yaml`'s `env_file:` key
+points at (resolved relative to `automation/` at the webroot root, not this
+folder; see `automation/README.md` for how that's set). Key variables:
 
 ```
 ANTHROPIC_API_KEY     # Claude — for browser UX, not CLI
@@ -200,16 +207,16 @@ BETTER_AUTH_SECRET
 REQUIRE_AUTH          # optional — true/false to override host-based auth gate
 ```
 
-The `lib/env-loader.ts` file handles reading these at runtime. **Non-secret** auth/site settings (origins, base URLs, mode flags) belong in `docker/webroot.yaml`; **secrets** (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) stay in `docker/.env`. See **Authentication (better-auth)** below for the full auth variable list and the OAuth provider credentials.
+The `lib/env-loader.ts` file handles reading these at runtime. **Non-secret** auth/site settings (origins, base URLs, mode flags) belong in `docker/webroot.yaml`; **secrets** (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) stay in the local env file (see `automation/paths.yaml`). See **Authentication (better-auth)** below for the full auth variable list and the OAuth provider credentials.
 
 ### Where to document new env vars
 
-There is **no `chat/.env.example`**. The canonical sample env file for this app lives at the webroot root: **`../docker/.env.example`**. Add new variable placeholders and explanatory comments there, not inside `chat/`.
+There is **no `chat/.env.example`**. The canonical sample env file for this app lives at the webroot root: **`../automation/.env.example`**. Add new variable placeholders and explanatory comments there, not inside `chat/`.
 
 Agent behavior when adding a new env var example:
 
-1. Add the placeholder + comment to `docker/.env.example`.
-2. **Ask the user** whether the same placeholder should also be appended to `docker/.env` (the live config). Don't add it silently — the live file may already be populated and the user may want to set a real value rather than a placeholder.
+1. Add the placeholder + comment to `automation/.env.example`.
+2. **Ask the user** whether the same placeholder should also be appended to their local env file (the live config, see `automation/paths.yaml`). Don't add it silently — the live file may already be populated and the user may want to set a real value rather than a placeholder.
 
 ### Vector DB sync (RAG ingestion)
 
@@ -360,9 +367,9 @@ The fix is to avoid cross-origin cookie writes/reads entirely:
 
 ### Auth configuration & secrets
 
-Non-secret auth settings belong in **`docker/webroot.yaml`** (the committed site config). Secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in `docker/.env` — never in `webroot.yaml`.
+Non-secret auth settings belong in **`docker/webroot.yaml`** (the committed site config). Secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) — never in `webroot.yaml`.
 
-Relevant env vars (loaded from `docker/.env`):
+Relevant env vars (loaded from the local env file — see "Environment Variables" above):
 
 ```
 BETTER_AUTH_SECRET        # required, min 32 chars — signs the JWE session
@@ -386,8 +393,8 @@ Vercel's dashboard supports bulk paste: **Project → Settings → [choose Produ
 Environment Variables → Add → paste multiple lines** in `KEY=VALUE` format (same
 as `.env`). This is the fastest way to populate secrets.
 
-However, several vars have **different values in production** vs the local
-`docker/.env`. The section at the bottom of `docker/.env` labelled
+However, several vars have **different values in production** vs your
+local env file. The section at the bottom of that file labelled
 `# Production Vercel` lists the overrides to paste — use those values instead of
 the localhost ones. Vars not listed there are environment-agnostic and can be
 pasted as-is.
@@ -468,7 +475,7 @@ Vercel dashboard settings for Mode B:
 
 ### Path resolution must stay relative
 
-- `lib/env-loader.ts` probes `../docker/.env` (relative to `chat/` as cwd) then `docker/.env` (relative to cwd if cwd is the webroot root) — keep both candidates.
+- `lib/env-loader.ts` probes `../automation` (relative to `chat/` as cwd) then `automation` (relative to cwd if cwd is the webroot root) to find `paths.yaml` — keep both candidates.
 - `next.config.mjs` anchors `turbopack.root = __dirname` (the `chat/` directory) — keep root detection anchored to the config file location, not to a folder name.
 - `server.mjs` uses `CHAT_DIR = dirname(fileURLToPath(import.meta.url))` and `WEBROOT = resolve(CHAT_DIR, '..')` — already correct regardless of what the parent folder is named.
 

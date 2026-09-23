@@ -9,7 +9,7 @@ The `sanity/` submodule is not edited directly by this integration.
 
 If Sanity env vars are missing or invalid, the combined server stays up and `/sanity` serves a local fallback status/setup page from `chat/server.mjs` instead of crashing the shared dev host.
 
-Use `docker/.env` as the shared local config source for Sanity values. Add these placeholders to `docker/.env.example` and set real values in `docker/.env`:
+Use the local env file (the one `automation/paths.yaml` points at) as the shared local config source for Sanity values. Add these placeholders to `automation/.env.example` and set real values in your local env file:
 
 ```env
 NEXT_PUBLIC_SANITY_PROJECT_ID=your_sanity_project_id
@@ -35,7 +35,7 @@ Injected automatically by `chat/server.mjs` for the mounted runtime:
 Notes:
 
 - `projectId` and `dataset` are public identifiers and safe to expose as `NEXT_PUBLIC_*`.
-- `SANITY_API_READ_TOKEN` is a secret and should only live in `docker/.env`, not in committed config with a real value.
+- `SANITY_API_READ_TOKEN` is a secret and should only live in your local env file, not in committed config with a real value.
 - The mounted runtime copy is rebuilt from the pristine `sanity/` source when `start chat` runs.
 - You can usually discover `projectId` and `dataset` from existing Sanity project config or the Sanity CLI.
 - Existing token secrets generally cannot be retrieved later; if needed, create a new Viewer token in Sanity.

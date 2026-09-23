@@ -6,7 +6,7 @@
 
 Auth is provided by **better-auth** in the [chat](../../../../chat/) repo (`chat/lib/auth/instance.ts`). Each provider uses a server-side redirect flow — the browser navigates to `/api/oauth/:provider`, which redirects to the provider's authorization page. After authorization, the provider calls back to `/api/auth/callback/:provider`.
 
-Enable a provider by adding both its `CLIENT_ID` and `CLIENT_SECRET` to `docker/.env`. A provider with only one variable set is ignored.
+Enable a provider by adding both its `CLIENT_ID` and `CLIENT_SECRET` to your local env file (see `automation/paths.yaml`). A provider with only one variable set is ignored.
 
 ## Callback URL Pattern
 
@@ -144,7 +144,7 @@ Provider name: `facebook`
 
 ## Environment Variables
 
-Set in `docker/.env`. Each provider auto-enables when **both** its vars are present.
+Set in your local env file (see `automation/paths.yaml`). Each provider auto-enables when **both** its vars are present.
 
 ```
 BETTER_AUTH_SECRET=           # required — min 32 chars: openssl rand -base64 32

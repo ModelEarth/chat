@@ -33,7 +33,7 @@ let cachedClient: sheets_v4.Sheets | null = null;
 let cachedCredentialsKey: string | null = null;
 
 // Cache the client per-process, but rebuild it if the underlying env var
-// changes (e.g. a dev server picking up an edited docker/.env after restart).
+// changes (e.g. a dev server picking up an edited local env file after restart).
 export function getSheetsClient(): sheets_v4.Sheets | null {
   const credentialsKey = process.env.GOOGLE_SERVICE_KEY_JSON || process.env.GOOGLE_SERVICE_KEY || null;
   if (!credentialsKey) return null;

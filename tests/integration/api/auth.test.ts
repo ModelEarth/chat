@@ -17,7 +17,7 @@
  *
  * REQUIREMENTS:
  * - Supabase must be running locally at http://localhost:54321
- * - Environment variables must be set (see docker/.env.example at the webroot root)
+ * - Environment variables must be set (see automation/.env.example at the webroot root)
  * - To run Supabase locally: `npx supabase start`
  *
  * NOTE: These tests will be skipped if Supabase is not available.
