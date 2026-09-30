@@ -407,6 +407,24 @@ export function Chat({
     );
   }, [messages]);
 
+  // Text of the most recent assistant answer, for the "Combine these" button
+  // in RepoDocsPanel — same memoization reasoning as lastUserText above.
+  const lastAssistantText = useMemo(() => {
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    return (
+      lastAssistantMessage?.parts
+        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join(" ") ?? ""
+    );
+  }, [messages]);
+
+  // The chat answer is only safe to combine once it's actually finished —
+  // "submitted"/"streaming" both mean more text could still arrive.
+  const chatAnswerReady = status === "ready";
+
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
   const dataParam = searchParams.get("data");
@@ -500,7 +518,12 @@ export function Chat({
           selectedVisibilityType={initialVisibilityType}
         />
 
-        <RepoDocsPanel query={lastUserText} selectedRepos={ragSelectedRepos} />
+        <RepoDocsPanel
+          chatAnswer={lastAssistantText}
+          chatAnswerReady={chatAnswerReady}
+          query={lastUserText}
+          selectedRepos={ragSelectedRepos}
+        />
 
         <Messages
           chatId={id}
