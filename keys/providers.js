@@ -59,7 +59,13 @@ const _providers = [
     keyHint: 'Google AI Studio key',
     getKeyUrl: 'https://aistudio.google.com/app/apikey',
     models: [
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Enhanced flash model with better performance', isDefault: true,  active: true,  supportsThinkingMode: true  },
+      // Google has retired Gemini versions faster than this list gets updated —
+      // 2.0-flash, then 2.5-flash, were both rejected live with "no longer
+      // available ... use <newer id>" (2026-09). 3.8-flash is the id Google's
+      // own error named most recently; kept the older ones listed (not
+      // default) in case some accounts still have access to them.
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', description: 'Current default flash model', isDefault: true,  active: true,  supportsThinkingMode: true  },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Enhanced flash model with better performance', isDefault: false, active: true,  supportsThinkingMode: true  },
       { id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',   description: 'Most capable model for complex tasks',         isDefault: false, active: true,  supportsThinkingMode: true  },
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Fast, efficient model for most tasks',         isDefault: false, active: true,  outputs: ['image'] },
       { id: 'gemma-3',          name: 'Gemma 3',           description: 'Open source model for basic tasks',           isDefault: false, active: true  },

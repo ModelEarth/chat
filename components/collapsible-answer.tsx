@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /**
  * Clips a long answer to a few paragraphs with a "More details" toggle, so the
  * repo-docs answer and the normal chat answer read as two matching blocks
- * stacked one above the other (per Loren's email), not a wall of text.
+ * stacked one above the other, not a wall of text.
  *
  * Clips with CSS max-height rather than slicing the text, so the markdown
  * rendering inside `children` is completely untouched and the full answer is
