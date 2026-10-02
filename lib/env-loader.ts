@@ -6,9 +6,8 @@ import { readEnvFileSetting } from './parse-env-file-setting.mjs';
 /**
  * Load environment variables from the .env file that
  * ../automation/paths.yaml's `env_file:` key points at — the same key
- * automation/sync-config.sh reads and writes — instead of a hardcoded
- * docker/.env path, so there's exactly one place (per machine) that says
- * where secrets live.
+ * automation/sync-config.sh reads and writes — so there's exactly one place
+ * (per machine) that says where secrets live.
  *
  * Probes two locations for automation/ to support two run modes:
  *

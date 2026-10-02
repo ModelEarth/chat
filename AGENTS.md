@@ -207,7 +207,7 @@ BETTER_AUTH_SECRET
 REQUIRE_AUTH          # optional — true/false to override host-based auth gate
 ```
 
-The `lib/env-loader.ts` file handles reading these at runtime. **Non-secret** auth/site settings (origins, base URLs, mode flags) belong in `docker/webroot.yaml`; **secrets** (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) stay in the local env file (see `automation/paths.yaml`). See **Authentication (better-auth)** below for the full auth variable list and the OAuth provider credentials.
+The `lib/env-loader.ts` file handles reading these at runtime. **Non-secret** auth/site settings (origins, base URLs, mode flags) belong in `home/webroot.yaml`; **secrets** (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) stay in the local env file (see `automation/paths.yaml`). See **Authentication (better-auth)** below for the full auth variable list and the OAuth provider credentials.
 
 ### Where to document new env vars
 
@@ -292,7 +292,7 @@ The sidebar (`components/app-sidebar.tsx`) has a top icon row defined in the `TA
 | `kb` | `BookOpen` | Knowledge Base | Suggested questions that pre-populate the chat input |
 | `visibility` | `BrainCog` | AI Models & Keys | All provider models with availability indicators + key management (`KeyManagerPanel`) |
 
-The `visibility` tab (formerly using `Lock`, label "Visibility") is being repurposed to show the full AI model list and key management UI — see `team/key/PLAN.md` Phase 3. The Private/Public visibility toggle moves into that panel alongside the model list.
+The `visibility` tab (formerly using `Lock`, label "Visibility") is being repurposed to show the full AI model list and key management UI — see `keys/PLAN.md` Phase 3. The Private/Public visibility toggle moves into that panel alongside the model list.
 
 > **New tabs** added to the `TABS` array should use `lucide-react` icons for visual consistency with the existing row.
 
@@ -339,7 +339,7 @@ Auth is provided by **better-auth**, integrated alongside (not replacing) the pr
 
 Non-React sites across the webroot (team, localsite-based pages, etc.) do **not** ship their own auth UI. They call a single shared dispatcher, `showAuthModal()`, defined once in `localsite/js/localsite.js` (the universal include on every site). That dispatcher contains no auth logic — it looks up **where** the auth modal lives and loads it from this chat repo's `chat/auth/` (served at `/chat/auth/...`).
 
-The auth source is configured in **`docker/webroot.yaml`** under the `auth:` block (`modal_url_*`, `plugin_url_*`, `api_url_*`, `source_repo`). `showAuthModal()` resolves it in this order: `window.webrootAuth` → the `auth:` block fetched from `/docker/webroot.yaml` → built-in fallback (`/auth/js/auth-modal.js` at the site root, i.e. this repo). This indirection lets the auth source be repointed to a different repo later without editing any site code.
+The auth source is configured in **`home/webroot.yaml`** under the `auth:` block (`modal_url_*`, `plugin_url_*`, `api_url_*`, `source_repo`). `showAuthModal()` resolves it in this order: `window.webrootAuth` → the `auth:` block fetched from `/home/webroot.yaml` → built-in fallback (`/auth/js/auth-modal.js` at the site root, i.e. this repo). This indirection lets the auth source be repointed to a different repo later without editing any site code.
 
 **In-page launcher:** when localsite inserts its account panel (`template-main.html`, which holds `#accountPanelInserts`), `loadLocalTemplate()` calls `initAuthPlugin()`, which loads this repo's **`auth-plugin.js`** (`plugin_url_*` from `webroot.yaml`). The plugin injects the sign-in button + session state inline into `#accountPanelInserts` and opens the modal on click — so sign-in works **in-page**, not only as a popup. It's loaded only where the account panel exists, so header-less pages get no floating button.
 
@@ -367,7 +367,7 @@ The fix is to avoid cross-origin cookie writes/reads entirely:
 
 ### Auth configuration & secrets
 
-Non-secret auth settings belong in **`docker/webroot.yaml`** (the committed site config). Secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) — never in `webroot.yaml`.
+Non-secret auth settings belong in **`home/webroot.yaml`** (the committed site config). Secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) — never in `webroot.yaml`.
 
 Relevant env vars (loaded from the local env file — see "Environment Variables" above):
 

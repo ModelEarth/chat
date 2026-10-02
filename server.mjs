@@ -52,8 +52,7 @@ const AUTOMATION_DIR = join(WEBROOT, 'automation')
 // before Next.js boots. Mirrors lib/env-loader.ts exactly — both share
 // lib/parse-env-file-setting.mjs's paths.yaml parsing and the same fallback
 // chain (automation/paths.yaml → local chat/.env → system env) — instead of
-// a hardcoded docker/.env path or a second, hand-kept-in-sync copy of the
-// parsing logic.
+// a second, hand-kept-in-sync copy of the parsing logic.
 
 try {
   const { config } = await import('dotenv')

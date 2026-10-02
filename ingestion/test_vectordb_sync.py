@@ -30,8 +30,8 @@ import vector_db_sync  # type: ignore
 
 def resolve_env_path() -> Path:
     """Find the local env file the same way lib/env-loader.ts does: read
-    automation/paths.yaml's `env_file:` key instead of a hardcoded
-    docker/.env path. If paths.yaml doesn't exist yet, or has no env_file:
+    automation/paths.yaml's `env_file:` key. If paths.yaml doesn't exist
+    yet, or has no env_file:
     set, this is a no-op — run automation/sync-config.sh once, or add it by
     hand. Falls back further to a chat/.env.local or chat/.env file for a
     standalone chat/ checkout with no automation/ folder."""

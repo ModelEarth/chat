@@ -39,7 +39,7 @@ The static `index.html` is served by the webroot static server at `/chat/auth/`.
 <script src="/chat/auth/js/auth-plugin.js" defer></script>
 ```
 
-`localsite.js` resolves the correct URL using the `auth:` block in `docker/webroot.yaml`.
+`localsite.js` resolves the correct URL using the `auth:` block in `home/webroot.yaml`.
 
 ### Standalone Vercel (chat is the site root)
 
@@ -77,7 +77,7 @@ Set `REQUIRE_AUTH=true` in env vars to require login for the entire site (middle
 `BETTER_AUTH_SECRET` is required before any provider will work.
 
 **Local** (your local env file, see `automation/paths.yaml`): any strong random value works. Sessions stay local
-because `api_url_development` in `docker/webroot.yaml` always points to
+because `api_url_development` in `home/webroot.yaml` always points to
 `localhost:3700`, never to Vercel.
 
 ```

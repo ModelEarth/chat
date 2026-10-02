@@ -26,8 +26,8 @@ Do not commit automatically while implementing this plan.
 - Auth backend is better-auth: `betterauth/auth.ts` (full, DB-backed), `betterauth/auth-edge.ts` (stateless, no DB, used by edge middleware), `betterauth/client.ts` (React client).
 - OAuth provider credential env vars (each provider auto-enables only when **both** are set) — six pairs: `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `LINKEDIN_CLIENT_ID`/`SECRET`, `MICROSOFT_CLIENT_ID`/`SECRET`, `DISCORD_CLIENT_ID`/`SECRET`, `FACEBOOK_CLIENT_ID`/`SECRET`.
 - `POSTGRES_URL` is optional and backend-agnostic — Supabase is "one supported database, not the only one." No-DB mode already exists (`AUTH_MODE=stateless` / no `POSTGRES_URL`) and degrades gracefully.
-- Non-secret settings belong in `docker/webroot.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) / Vercel env vars in production.
-- There's a separate, unrelated key system for AI provider keys (browser-encrypted `localStorage['settings_api-keys']`, see `team/key/PLAN.md`) — **not** to be conflated with these server-side OAuth/DB secrets. Project 1's "copy keys to Vercel" panel is about *server* env vars, not browser-stored AI keys.
+- Non-secret settings belong in `home/webroot.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) / Vercel env vars in production.
+- There's a separate, unrelated key system for AI provider keys (browser-encrypted `localStorage['settings_api-keys']`, see `keys/PLAN.md`) — **not** to be conflated with these server-side OAuth/DB secrets. Project 1's "copy keys to Vercel" panel is about *server* env vars, not browser-stored AI keys.
 
 ## Current-code findings (research complete)
 
@@ -81,13 +81,13 @@ Do not commit automatically while implementing this plan.
 | Phase 4 — Reuse Supabase-style login form on `/auth` | Complete |
 | Phase 5 — DB reachability check + graying username/password fields | Complete |
 
-**Verification:** `tsc --noEmit` clean across the whole app; `biome check` on touched files shows zero new hard errors (only the same class of pre-existing nursery-rule warnings found throughout the repo's 26k-warning baseline). Direct `curl` checks against `/api/auth/local-env-values` confirm both the double-gate (spoofed non-local `Host` header → 404) and correct data (Google/GitHub/LinkedIn/Microsoft/Facebook present after the docker/.env fix, Discord correctly absent since it was never configured) after restarting the dev server to pick up the renamed env vars. **Full visual/browser screenshot verification could not be completed** — Playwright's `chromium_headless_shell` package would not download in this sandboxed environment across 6 attempts (confirmed not a corruption issue: a clean cache + single non-overlapping `chromium` install still couldn't resolve `chromium_headless_shell`, a separate download target). Recommend a manual look at `localhost:3700/auth` before considering this fully done.
+**Verification:** `tsc --noEmit` clean across the whole app; `biome check` on touched files shows zero new hard errors (only the same class of pre-existing nursery-rule warnings found throughout the repo's 26k-warning baseline). Direct `curl` checks against `/api/auth/local-env-values` confirm both the double-gate (spoofed non-local `Host` header → 404) and correct data (Google/GitHub/LinkedIn/Microsoft/Facebook present after the shared .env fix, Discord correctly absent since it was never configured) after restarting the dev server to pick up the renamed env vars. **Full visual/browser screenshot verification could not be completed** — Playwright's `chromium_headless_shell` package would not download in this sandboxed environment across 6 attempts (confirmed not a corruption issue: a clean cache + single non-overlapping `chromium` install still couldn't resolve `chromium_headless_shell`, a separate download target). Recommend a manual look at `localhost:3700/auth` before considering this fully done.
 
 ---
 
 ## Phase 0 — Fix `automation/.env.example` naming bug
 
-Add correct `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` placeholders (matching what `lib/auth/instance.ts` actually reads and what `chat/auth/oauth-setup.md` already documents) to `automation/.env.example`. Leave `DISCORD_BOT_TOKEN` alone (different purpose). Ask the user before touching `docker/.env` itself, per `chat/AGENTS.md`'s env-var-doc policy.
+Add correct `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` placeholders (matching what `lib/auth/instance.ts` actually reads and what `chat/auth/oauth-setup.md` already documents) to `automation/.env.example`. Leave `DISCORD_BOT_TOKEN` alone (different purpose). Ask the user before touching the shared `.env` itself (the `env_file` set by `automation/paths.yaml`), per `chat/AGENTS.md`'s env-var-doc policy.
 
 ## Phase 1 — Server: pipe existing provider-enabled booleans to `SocialLoginButtons`
 
@@ -99,7 +99,7 @@ Add correct `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` and `FACEBOOK_CLIENT_ID`
 - Add the missing `facebook` entry to `PROVIDERS`.
 - Accept `configuredProviders` prop; render the disabled/grayed state for any provider not in it — mirror `auth-modal.js`'s `.auth-btn.inactive` styling (opacity, dashed border, grayscale icon) rather than inventing new CSS.
 - Decide click behavior for a grayed button (see open question below) instead of reusing the legacy `alert()`.
-- **Placeholder-aware "configured" check** (`chat/lib/auth/env-placeholder.ts`, shared with Phase 3): `isSocialProviderConfigured` treats a *present but still-placeholder* client id/secret (e.g. `your-google-client-id...`) as **not** configured — presence alone isn't enough. Discovered this mattered when every provider except Discord initially showed as "configured" purely because `docker/.env` had non-empty placeholder text copied from `.env.example`, not real credentials — only Discord (which had no value at all) was correctly grayed. After this fix, all 6 buttons correctly gray out in this environment, since none currently hold real credentials.
+- **Placeholder-aware "configured" check** (`chat/lib/auth/env-placeholder.ts`, shared with Phase 3): `isSocialProviderConfigured` treats a *present but still-placeholder* client id/secret (e.g. `your-google-client-id...`) as **not** configured — presence alone isn't enough. Discovered this mattered when every provider except Discord initially showed as "configured" purely because the shared `.env` had non-empty placeholder text copied from `.env.example`, not real credentials — only Discord (which had no value at all) was correctly grayed. After this fix, all 6 buttons correctly gray out in this environment, since none currently hold real credentials.
 
 ## Phase 3 — Localhost-only "copy keys to Vercel" panel
 
@@ -134,7 +134,7 @@ Replace (or wrap) `isSupabaseConfigured` with a generic reachability check that 
 | File | Action |
 |---|---|
 | `automation/.env.example` | Added correct `DISCORD_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET` placeholders |
-| `docker/.env` | Renamed `FACEBOOK_APP_ID`→`FACEBOOK_CLIENT_ID`, `FACEBOOK_APP_SECRET`→`FACEBOOK_CLIENT_SECRET`, preserving existing values (user-confirmed) |
+| Former shared `.env` (now the `env_file` set by `automation/paths.yaml`) | Renamed `FACEBOOK_APP_ID`→`FACEBOOK_CLIENT_ID`, `FACEBOOK_APP_SECRET`→`FACEBOOK_CLIENT_SECRET`, preserving existing values (user-confirmed) |
 | `chat/lib/auth/social-providers.ts` | **New** — leaf module, single source of truth for the 6 provider env-var-name pairs + `isSocialProviderConfigured`/`getConfiguredSocialProviders`; configured check now also rejects placeholder-valued credentials |
 | `chat/lib/auth/env-placeholder.ts` | **New** — shared `isPlaceholderValue(varName, value)`, used by both the button-graying check and the copy panel so they agree on what counts as "not really set" |
 | `chat/lib/auth/instance.ts` | Refactored `socialProviders.*.enabled` to call `isSocialProviderConfigured` instead of duplicating `!!(...)` checks |
