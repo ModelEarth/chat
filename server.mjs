@@ -28,13 +28,15 @@
  * instead, which uses the Next.js default bundler.
  */
 
-import { spawn } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
 import { createServer, request as proxyRequest } from 'node:http'
 import { connect as connectSocket } from 'node:net'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
 import { createReadStream, statSync, existsSync } from 'node:fs'
 import { createPrivateKey, createPublicKey } from 'node:crypto'
+import { freemem, totalmem, loadavg } from 'node:os'
+import { getHeapStatistics } from 'node:v8'
 import { fileURLToPath } from 'node:url'
 import next from 'next'
 import { prepareSanityRuntime } from './sanity/prepare-runtime.mjs'
@@ -258,6 +260,50 @@ async function validateProviderKey(provider, key) {
   }
 }
 
+function run(command, args) {
+  return new Promise((resolve) => {
+    execFile(command, args, { maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => resolve(error ? '' : stdout))
+  })
+}
+
+// Processes listening on TCP ports (this user's, as lsof reports without
+// sudo), one entry per process, with resident memory from ps.
+async function listeningPorts() {
+  const byPid = new Map()
+  let pid = null
+  for (const line of (await run('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpcn'])).split('\n')) {
+    const field = line[0]
+    const value = line.slice(1)
+    if (field === 'p') {
+      pid = Number(value)
+      if (!byPid.has(pid)) byPid.set(pid, { pid, name: '', ports: new Set() })
+    } else if (field === 'c' && pid) {
+      byPid.get(pid).name = value
+    } else if (field === 'n' && pid) {
+      const port = Number(value.slice(value.lastIndexOf(':') + 1))
+      if (port) byPid.get(pid).ports.add(port)
+    }
+  }
+  if (!byPid.size) return []
+  const details = new Map()
+  for (const line of (await run('ps', ['-o', 'pid=,rss=,args=', '-p', [...byPid.keys()].join(',')])).split('\n')) {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/)
+    if (!match) continue
+    // Program and script names only, no full paths or later arguments.
+    const command = match[3].split(/\s+/).slice(0, 3).map((part) => part.split('/').pop()).join(' ').slice(0, 60)
+    details.set(Number(match[1]), { rssMB: Math.round(Number(match[2]) / 1024), command })
+  }
+  return [...byPid.values()]
+    .map((entry) => ({
+      pid: entry.pid,
+      name: entry.name,
+      ports: [...entry.ports].sort((a, b) => a - b),
+      rssMB: details.get(entry.pid)?.rssMB ?? null,
+      command: details.get(entry.pid)?.command ?? entry.name,
+    }))
+    .sort((a, b) => (b.rssMB ?? 0) - (a.rssMB ?? 0))
+}
+
 async function tryInternalApi(req, pathname, res) {
   if (pathname === '/api/status' && req.method === 'GET') {
     sendJson(res, 200, {
@@ -275,6 +321,57 @@ async function tryInternalApi(req, pathname, res) {
       webroot: WEBROOT,
       timestamp: new Date().toISOString(),
     })
+    return true
+  }
+
+  // Memory of this dev server, for team/admin/memory/ in webroot. Readable
+  // from other localhost pages (e.g. webroot on 8887); the server only
+  // listens on localhost.
+  if (pathname === '/api/server-memory' && req.method === 'GET') {
+    const origin = req.headers.origin || ''
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+    }
+    const mb = (bytes) => Math.round(bytes / 1048576)
+    const memory = process.memoryUsage()
+    const heap = getHeapStatistics()
+    sendJson(res, 200, {
+      server: 'node chat/server.mjs',
+      node: process.version,
+      pid: process.pid,
+      port: PORT,
+      uptimeSeconds: Math.round(process.uptime()),
+      rssMB: mb(memory.rss),
+      heapUsedMB: mb(memory.heapUsed),
+      heapTotalMB: mb(memory.heapTotal),
+      heapLimitMB: mb(heap.heap_size_limit),
+      externalMB: mb(memory.external),
+      systemFreeMB: mb(freemem()),
+      systemTotalMB: mb(totalmem()),
+      loadAverage: loadavg().map((n) => Math.round(n * 100) / 100),
+      timestamp: new Date().toISOString(),
+    })
+    return true
+  }
+
+  // Every process listening on a local TCP port, with its memory, for the
+  // ports panel in team/admin/memory/. It lists process names, so other
+  // websites open in the browser can't read it: requests carrying an Origin
+  // must come from localhost.
+  if (pathname === '/api/port-memory' && req.method === 'GET') {
+    const origin = req.headers.origin || ''
+    const localOrigin = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+    if (origin && !localOrigin) {
+      res.statusCode = 403
+      res.end('Local pages only')
+      return true
+    }
+    const ports = await listeningPorts()
+    // Not sendJson, which allows any origin.
+    res.statusCode = 200
+    if (localOrigin) res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.end(JSON.stringify({ ports, timestamp: new Date().toISOString() }))
     return true
   }
 

@@ -34,6 +34,8 @@ export function EmailPasswordSignIn({
   const [email, setEmail] = useState("");
   const [isSuccessful, setIsSuccessful] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Shown inline above the Email Address field rather than as a toast.
+  const [formError, setFormError] = useState("");
 
   const getErrorMessage = useCallback((authError: string): string => {
     if (authError.includes("Invalid login credentials")) {
@@ -76,7 +78,7 @@ export function EmailPasswordSignIn({
         severity
       );
 
-      toast({ type: "error", description: userMessage });
+      setFormError(userMessage);
       setIsSubmitting(false);
     }
   }, [error, email, getErrorMessage]);
@@ -92,9 +94,10 @@ export function EmailPasswordSignIn({
     const password = formData.get("password") as string;
 
     if (!emailValue || !password) {
-      toast({ type: "error", description: "Please enter both email and password." });
+      setFormError("Please enter both email and password.");
       return;
     }
+    setFormError("");
 
     setEmail(emailValue);
     setIsSubmitting(true);
@@ -136,6 +139,14 @@ export function EmailPasswordSignIn({
       <div className={showDivider ? "rounded-lg border border-border bg-muted/30 p-4" : ""}>
         <DbStatusBanner status={dbStatus} isVercel={isVercel} className="mx-4 mt-1.5 mb-4 sm:mx-16" />
         <div className={dbUnavailable ? "pointer-events-none select-none opacity-40" : ""}>
+          {formError && (
+            <p
+              className="mx-4 mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-800 text-sm sm:mx-16 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+              role="alert"
+            >
+              {formError}
+            </p>
+          )}
           <AuthForm action={handleSubmit} defaultEmail={email}>
             <SubmitButton disabled={isSubmitting || loading || dbUnavailable} isSuccessful={isSuccessful}>
               {isSubmitting ? "Signing in..." : "Sign in"}
