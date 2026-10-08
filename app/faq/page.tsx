@@ -47,7 +47,7 @@ export default function FAQPage() {
                 },
                 {
                     q: "Why is it free?",
-                    a: "We believe AI should be accessible to everyone. By using your own API keys, you pay the AI providers directly at their cost, and we don't need to mark up prices or charge subscription fees. This keeps the service free and transparent."
+                    a: "We believe AI should be accessible to everyone. By using your own API keys, you pay the AI providers directly at their cost and use free LLMs like Gemini, and we don't need to mark up prices or charge subscription fees. This keeps the service free and transparent."
                 },
                 {
                     q: "What are API keys and how do I get them?",

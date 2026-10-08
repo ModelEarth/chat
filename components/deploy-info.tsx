@@ -9,14 +9,18 @@ export function DeployInfo(): React.JSX.Element | null {
   }
   const commit = process.env.BUILD_COMMIT;
   const label = new Date(built).toLocaleString("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
   });
 
   return (
-    <p className="text-center text-gray-400 text-xs dark:text-zinc-500">
-      Updated <time dateTime={built}>{label} UTC</time>
+    <p className="pb-4 text-center text-gray-400 text-xs dark:text-zinc-500">
+      Updated <time dateTime={built}>{label}</time>
       {commit && (
         <>
           {" · "}

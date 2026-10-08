@@ -19,7 +19,7 @@ export async function PublicLayout({ children }: { children: React.ReactNode }) 
       <TopNav isWebroot={isWebroot} isLoggedIn={isLoggedIn} />
       <SidebarProvider defaultOpen={!isCollapsed}>
         <AppSidebar />
-        <SidebarInset className="pt-[73px]">{children}</SidebarInset>
+        <SidebarInset className="min-w-0 pt-[73px]">{children}</SidebarInset>
       </SidebarProvider>
     </DataStreamProvider>
   );

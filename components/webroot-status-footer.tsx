@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 // Localhost-only dev indicator shown at the bottom of chat-rendered pages.
-// Webroot mode (`node chat/server.mjs`) serves the entire webroot via Node, so
+// Webroot mode (`node chat/server.mjs`) serves the entire webroot via standard
+// Node.js (the Next.js dev server, not Cloudflare's workerd), so
 // sibling static repos like /localsite/ are reachable and server-side endpoints
 // (auth/OAuth API) are live. Chat-repo mode (`pnpm dev`) serves only the chat
 // app. We tell them apart with a quick HEAD probe of a static webroot path.
@@ -27,9 +28,20 @@ export function WebrootStatusFooter() {
   if (!state) return null;
 
   const { port, webroot } = state;
-  const message = webroot
-    ? `Entire webroot is server-side NodeJS enabled for port ${port}`
-    : `Chat app only on port ${port} — static webroot not Node-served`;
+  const message = webroot ? (
+    <>
+      Viewing locally via standard NodeJS (
+      <a
+        href="https://nodejs.org/learn/getting-started/the-v8-javascript-engine"
+        style={{ color: "inherit", pointerEvents: "auto", textDecoration: "underline" }}
+      >
+        V8
+      </a>
+      ) on port {port}
+    </>
+  ) : (
+    `Chat app only on port ${port} — static webroot not Node-served`
+  );
 
   return (
     <div

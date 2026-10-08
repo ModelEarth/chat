@@ -10,6 +10,7 @@ import {
   Globe,
   Lock
 } from "lucide-react";
+import { siteTitleIntro } from "@/lib/site";
 
 export function LandingPage() {
   return (
@@ -32,7 +33,7 @@ export function LandingPage() {
 
             {/* Main Heading */}
             <h1 className="mb-6 font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent leading-tight text-2xl @sm:text-4xl @md:text-5xl @xl:text-7xl">
-              Earthscape Chat
+              {siteTitleIntro}
             </h1>
 
             {/* Subheading */}
@@ -158,7 +159,7 @@ export function LandingPage() {
               <h2 className="mb-6 font-bold text-4xl md:text-5xl">Why It's Free</h2>
               <p className="mb-8 text-lg md:text-xl text-white/90 leading-relaxed">
                 We believe AI should be accessible to everyone. By using your own API keys,
-                you pay AI providers directly at their cost—no markups, no subscriptions,
+                you pay AI providers directly at their cost and use free LLMs like Gemini—no markups, no subscriptions,
                 no hidden fees. Just pure, transparent AI power.
               </p>
               <div className="grid gap-6 md:grid-cols-3 text-left">

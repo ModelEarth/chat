@@ -78,14 +78,14 @@ export function EnvKeyPanel({ apiPath, title, description, copyAllLabel }: EnvKe
       <ul className="mt-3 flex flex-col gap-1.5">
         {values.map((entry) => (
           <li key={entry.name} className="flex items-center justify-between gap-3 rounded-md bg-background px-3 py-2">
-            <span className="font-mono text-muted-foreground text-xs">{entry.name}</span>
+            <span className="shrink-0 font-mono text-muted-foreground text-xs">{entry.name}</span>
             {entry.isPlaceholder ? (
-              <span className="flex-1 truncate text-right text-muted-foreground text-xs italic">
+              <span className="min-w-0 flex-1 truncate text-right text-muted-foreground text-xs italic">
                 not yet configured (placeholder)
               </span>
             ) : (
               <span
-                className="flex-1 select-none truncate text-right font-mono text-xs"
+                className="min-w-0 flex-1 select-none truncate text-right font-mono text-xs"
                 style={{ filter: "blur(4px)" }}
                 aria-hidden="true"
               >

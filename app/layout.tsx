@@ -8,11 +8,12 @@ import { WebrootStatusFooter } from "@/components/webroot-status-footer";
 import { AuthProvider } from "@/lib/auth/context";
 
 import "./globals.css";
+import { siteTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://chat.vercel.ai"),
-  title: "Earthscape by DreamStudio",
-  description: "Earthscape by DreamStudio — AI-powered chat experience.",
+  title: `${siteTitle} by DreamStudio`,
+  description: `${siteTitle} by DreamStudio — AI-powered chat experience.`,
 };
 
 export const viewport = {
