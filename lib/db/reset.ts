@@ -3,12 +3,15 @@ import { loadEnvironment } from "../env-loader";
 
 loadEnvironment();
 
+// chat's database: CHAT_POSTGRES_URL, or POSTGRES_URL (see lib/db/queries/base.ts).
+const DATABASE_URL = process.env.CHAT_POSTGRES_URL || process.env.POSTGRES_URL;
+
 const resetDatabase = async () => {
-  if (!process.env.POSTGRES_URL) {
-    throw new Error("POSTGRES_URL is not defined");
+  if (!DATABASE_URL) {
+    throw new Error("CHAT_POSTGRES_URL (or POSTGRES_URL) is not defined");
   }
 
-  const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
+  const connection = postgres(DATABASE_URL, { max: 1 });
 
   console.log("🗑️  Resetting database...");
   console.log("📋 Dropping existing tables...");

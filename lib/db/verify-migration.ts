@@ -4,6 +4,9 @@ import { isNeonTarget } from "./migration-target";
 
 loadEnvironment();
 
+// chat's database: CHAT_POSTGRES_URL, or POSTGRES_URL (see lib/db/queries/base.ts).
+const DATABASE_URL = process.env.CHAT_POSTGRES_URL || process.env.POSTGRES_URL;
+
 type VerificationResult = {
   category: string;
   passed: boolean;
@@ -11,14 +14,14 @@ type VerificationResult = {
 };
 
 const verifyMigration = async (): Promise<void> => {
-  if (!process.env.POSTGRES_URL) {
-    throw new Error("POSTGRES_URL is not defined");
+  if (!DATABASE_URL) {
+    throw new Error("CHAT_POSTGRES_URL (or POSTGRES_URL) is not defined");
   }
 
-  const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
+  const connection = postgres(DATABASE_URL, { max: 1 });
   const results: VerificationResult[] = [];
   // Neon versions of the migrations: see migrations/neon/.
-  const neon = isNeonTarget(process.env.POSTGRES_URL);
+  const neon = isNeonTarget(DATABASE_URL);
   // On Neon the user_id triggers exist only when BetterAuth's "user" table is
   // in the same database (neon/0004_triggers.sql).
   const [{ hasUsers }] = await connection`select to_regclass('public."user"') is not null as "hasUsers"`;

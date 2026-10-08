@@ -6,9 +6,12 @@ import { isNeonTarget, migrationsFor } from "./migration-target";
 
 loadEnvironment();
 
+// chat's database: CHAT_POSTGRES_URL, or POSTGRES_URL (see lib/db/queries/base.ts).
+const DATABASE_URL = process.env.CHAT_POSTGRES_URL || process.env.POSTGRES_URL;
+
 const runMigrate = async () => {
-  if (!process.env.POSTGRES_URL) {
-    console.log("⚠️  POSTGRES_URL is not defined - skipping migrations");
+  if (!DATABASE_URL) {
+    console.log("⚠️  CHAT_POSTGRES_URL (or POSTGRES_URL) is not defined - skipping migrations");
     console.log("ℹ️  Migrations will be skipped for this build");
     return;
   }
@@ -23,8 +26,8 @@ const runMigrate = async () => {
     return;
   }
 
-  const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
-  const neon = isNeonTarget(process.env.POSTGRES_URL);
+  const connection = postgres(DATABASE_URL, { max: 1 });
+  const neon = isNeonTarget(DATABASE_URL);
 
   console.log(`⏳ Running migrations${neon ? " (Neon versions)" : ""}...`);
   console.log("📁 Migrations folder: ./lib/db/migrations");

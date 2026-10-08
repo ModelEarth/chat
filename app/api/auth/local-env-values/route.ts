@@ -11,7 +11,9 @@ import { SOCIAL_PROVIDER_ENV_VARS } from "@/lib/auth/social-providers";
 // Vercel deployment — never rely on the client hiding the panel alone.
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
-const EXTRA_VAR_NAMES = ["BETTER_AUTH_SECRET", "POSTGRES_URL"] as const;
+// CHAT_POSTGRES_URL also goes into Vercel as POSTGRES_URL (see
+// lib/db/queries/base.ts); automation/vercel-env.mjs sets both.
+const EXTRA_VAR_NAMES = ["BETTER_AUTH_SECRET", "CHAT_POSTGRES_URL", "AUTH_POSTGRES_URL"] as const;
 
 function isLocalRequest(request: Request): boolean {
   if (process.env.VERCEL) return false;

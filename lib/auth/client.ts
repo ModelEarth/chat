@@ -21,7 +21,7 @@ function friendlyError(err: { message?: string; status?: number } | null | undef
   if (raw.includes("rate") || status === 429)
     return new Error("Too many attempts. Please wait a moment and try again.");
   if (status >= 500 || raw.includes("database") || raw.includes("connect") || raw.includes("enotfound"))
-    return new Error("Unable to reach the database. Check that your Supabase project is active and POSTGRES_URL is correct in your .env file.");
+    return new Error("Unable to reach the database. Check that the database is awake and AUTH_POSTGRES_URL (or POSTGRES_URL) is correct in your env file.");
   return new Error(err?.message || "Something went wrong. Please try again.");
 }
 

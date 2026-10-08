@@ -10,10 +10,6 @@ import { getDbStatus } from "@/lib/auth/db-status";
 import { isAuthRequired } from "@/lib/auth/server";
 import { DeployInfo } from "@/components/deploy-info";
 
-// The social sign-in setup steps, shown as a static README page
-// (automation/index.html renders automation/README.md in the browser).
-const SOCIAL_CONFIG_URL = "https://cloud.model.earth/automation/";
-
 function getErrorMessage(error: string, provider?: string): string | null {
   if (error === "account_not_linked") {
     return "An account with this email already exists. Please sign in with your email and password instead.";
@@ -68,24 +64,15 @@ export default async function AuthPage({
               {errorMessage}
             </div>
           )}
-          {hasSocial ? (
-            <Suspense
-              fallback={
-                <div className="flex justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              }
-            >
-              <SocialLoginButtons configuredProviders={configuredProviders} />
-            </Suspense>
-          ) : (
-            <p className="text-center text-gray-500 text-sm dark:text-zinc-400">
-              We haven't activated social auth.{" "}
-              <a className="underline underline-offset-2 hover:text-gray-900 dark:hover:text-zinc-50" href={SOCIAL_CONFIG_URL}>
-                About Config
-              </a>
-            </p>
-          )}
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            }
+          >
+            <SocialLoginButtons configuredProviders={configuredProviders} />
+          </Suspense>
           <EmailPasswordSignIn dbStatus={dbStatus} isVercel={isVercel} showDivider={hasSocial} />
           <SupabaseKeyPanel />
           <LocalEnvKeyPanel />

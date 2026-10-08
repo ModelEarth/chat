@@ -69,7 +69,8 @@ The schema uses database triggers to enforce referential integrity:
 On Neon, users are in BetterAuth's `"user"` table (CloudRoot
 `auth/db/0001_create_better_auth_tables.sql`), normally in a separate user
 database that chat reads as `AUTH_POSTGRES_URL`; chat's data is in
-`POSTGRES_URL`. `migrate.ts` runs the versions in `migrations/neon/` (see
+`CHAT_POSTGRES_URL` (or `POSTGRES_URL`, the name it's duplicated under on
+Vercel). `migrate.ts` runs the versions in `migrations/neon/` (see
 `migrations/README.md`):
 
 - When `"user"` is in the same database, `validate_user_id()` checks it and

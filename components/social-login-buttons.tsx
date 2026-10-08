@@ -63,6 +63,10 @@ const PROVIDERS = [
   },
 ];
 
+// The social sign-in setup steps, a static README page in CloudRoot
+// (automation/index.html renders automation/README.md in the browser).
+const SOCIAL_CONFIG_URL = "https://cloud.model.earth/automation/";
+
 export function SocialLoginButtons({
   configuredProviders,
 }: {
@@ -99,6 +103,20 @@ export function SocialLoginButtons({
           Sign Out
         </Button>
       </div>
+    );
+  }
+
+  // No provider has both its client id and secret set: explain instead of
+  // showing a grid of disabled buttons. Signed-in users still see their
+  // profile and Sign Out above.
+  if (configured.size === 0) {
+    return (
+      <p className="text-center text-gray-500 text-sm dark:text-zinc-400">
+        We haven't activated social auth.{" "}
+        <a className="underline underline-offset-2 hover:text-gray-900 dark:hover:text-zinc-50" href={SOCIAL_CONFIG_URL}>
+          About Config
+        </a>
+      </p>
     );
   }
 
