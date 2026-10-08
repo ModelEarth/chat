@@ -59,14 +59,15 @@ When new migrations are added:
 | Supabase file | On Neon |
 |---|---|
 | `0002_functions.sql` | Runs, followed by `neon/0002_functions.sql`, which points the user functions at BetterAuth's `"user"` table and drops `get_user_role`, `is_current_user_admin` and `get_current_user_usage_summary` (they need Supabase's `auth.uid()`; chat doesn't call them) |
-| `0004_triggers.sql` | `neon/0004_triggers.sql`: the delete trigger is on `"user"` instead of `auth.users` |
+| `0004_triggers.sql` | `neon/0004_triggers.sql`: the user triggers use `"user"` instead of `auth.users`, and only when `"user"` is in the same database |
 | `0005_rls.sql` | `neon/0005_rls.sql`: RLS enabled, no policies, no grants to Supabase roles |
 | `0013_storage_setup.sql` | Skipped: Supabase Storage |
 
-Every other file runs unchanged. BetterAuth's `"user"` table must exist
-first: CloudRoot's `auth/db/0001_create_better_auth_tables.sql`, or
-`automation/setup-neon.mjs`, which also runs it. `npm run db:verify` checks
-the Neon variant on a Neon database.
+Every other file runs unchanged. The user tables normally live in a
+separate database (`AUTH_POSTGRES_URL`, CloudRoot's `automation/setup-neon.mjs`),
+and CloudRoot's `automation/setup-neon-chat.mjs` creates chat's own Neon
+project and runs these migrations there. `npm run db:verify` checks the
+Neon variant on a Neon database.
 
 ## Migration Naming Convention
 

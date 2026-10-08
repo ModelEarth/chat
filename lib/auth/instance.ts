@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, isDbConfigured } from "@/lib/db/queries/base";
+import { authDb, isAuthDbConfigured } from "@/lib/db/queries/base";
 import {
   betterAuthUser,
   betterAuthSession,
@@ -44,8 +44,8 @@ function createAuth() {
   basePath: "/api/auth",
   baseURL: resolveBaseURL(),
   secret: requireSecret(),
-  ...(isDbConfigured && db ? {
-    database: drizzleAdapter(db, {
+  ...(isAuthDbConfigured && authDb ? {
+    database: drizzleAdapter(authDb, {
       provider: "pg",
       schema: {
         user: betterAuthUser,
@@ -59,7 +59,7 @@ function createAuth() {
     enabled: true,
     requireEmailVerification: false,
     // bcrypt in Postgres, shared with the CloudRoot Worker (see password.ts).
-    ...(isDbConfigured && db ? { password: databasePasswordHashing(db) } : {}),
+    ...(isAuthDbConfigured && authDb ? { password: databasePasswordHashing(authDb) } : {}),
   },
   account: {
     accountLinking: {

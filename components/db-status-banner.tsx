@@ -10,11 +10,11 @@ const SUPABASE_DASHBOARD_URL = "https://supabase.com/dashboard/projects";
 export function getDbStatusMessage(status: DbStatus, isVercel: boolean): string {
   if (status === "not-configured") {
     return isVercel
-      ? "Activate by adding POSTGRES_URL to your Vercel environment variables."
-      : "Activate by adding POSTGRES_URL to your local env file (see automation/paths.yaml).";
+      ? "Activate by adding AUTH_POSTGRES_URL (the sign-in database) to your Vercel environment variables."
+      : "Activate by adding AUTH_POSTGRES_URL (the sign-in database) to your local env file (see automation/paths.yaml).";
   }
   if (status === "unreachable") {
-    return "Can't reach the database. If you're on Supabase's free tier, projects pause after about 14 days of inactivity — restart it from your Supabase dashboard.";
+    return "Can't reach the sign-in database. Free-tier Neon and Supabase databases pause when idle; open the database's dashboard to wake it.";
   }
   return "";
 }

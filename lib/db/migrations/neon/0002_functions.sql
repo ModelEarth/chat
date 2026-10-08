@@ -5,7 +5,8 @@
 --   BetterAuth's "user" table (CloudRoot auth/db/0001), not Supabase's
 --   auth.users, so the two user functions are redefined against it, and the
 --   functions built on Supabase's auth.uid() and JWT claims are dropped.
---   Requires the "user" table.
+--   The user functions are used only when "user" is in the same database
+--   (see neon/0004_triggers.sql).
 -- =====================================================
 
 -- Validate that user_id exists in BetterAuth's "user" table.

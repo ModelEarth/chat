@@ -67,13 +67,17 @@ The schema uses database triggers to enforce referential integrity:
 ### On Neon
 
 On Neon, users are in BetterAuth's `"user"` table (CloudRoot
-`auth/db/0001_create_better_auth_tables.sql`), and `migrate.ts` runs the
-versions in `migrations/neon/` (see `migrations/README.md`):
+`auth/db/0001_create_better_auth_tables.sql`), normally in a separate user
+database that chat reads as `AUTH_POSTGRES_URL`; chat's data is in
+`POSTGRES_URL`. `migrate.ts` runs the versions in `migrations/neon/` (see
+`migrations/README.md`):
 
-- `validate_user_id()` checks `"user"`, and `handle_auth_user_deletion()`
-  runs from an `on_user_deleted` trigger on `"user"`. `"user".id` is `text`
-  while chat's `user_id` columns are `uuid`, so these triggers stand in for
-  foreign keys here too.
+- When `"user"` is in the same database, `validate_user_id()` checks it and
+  an `on_user_deleted` trigger on `"user"` runs `handle_auth_user_deletion()`.
+  `"user".id` is `text` while chat's `user_id` columns are `uuid`, so these
+  triggers stand in for foreign keys. With a separate user database they're
+  skipped, since Postgres can't check across databases, and any `user_id`
+  is accepted.
 - RLS is enabled with no policies. chat connects as the database owner, which
   RLS doesn't restrict, and checks access in `lib/auth/server.ts`; any other
   role is denied every row.

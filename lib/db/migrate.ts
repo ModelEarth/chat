@@ -32,15 +32,6 @@ const runMigrate = async () => {
   const start = Date.now();
 
   try {
-    if (neon) {
-      const [{ exists }] = await connection`select to_regclass('public."user"') is not null as exists`;
-      if (!exists) {
-        throw new Error(
-          'BetterAuth\'s "user" table is missing. Run CloudRoot\'s auth/db/0001_create_better_auth_tables.sql (or automation/setup-neon.mjs) first.'
-        );
-      }
-    }
-
     const migrationFiles = migrationsFor(neon);
 
     for (const file of migrationFiles) {

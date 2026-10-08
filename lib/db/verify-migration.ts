@@ -19,6 +19,10 @@ const verifyMigration = async (): Promise<void> => {
   const results: VerificationResult[] = [];
   // Neon versions of the migrations: see migrations/neon/.
   const neon = isNeonTarget(process.env.POSTGRES_URL);
+  // On Neon the user_id triggers exist only when BetterAuth's "user" table is
+  // in the same database (neon/0004_triggers.sql).
+  const [{ hasUsers }] = await connection`select to_regclass('public."user"') is not null as "hasUsers"`;
+  const userTriggers = !neon || hasUsers;
 
   console.log("🔍 Starting Database Verification...");
   console.log("");
@@ -177,12 +181,16 @@ const verifyMigration = async (): Promise<void> => {
     // 4. Verify Triggers
     console.log("Checking triggers...");
     const expectedTriggers = [
-      { table: "Chat", trigger: "validate_chat_user_id" },
-      { table: "Document", trigger: "validate_document_user_id" },
+      ...(userTriggers
+        ? [
+            { table: "Chat", trigger: "validate_chat_user_id" },
+            { table: "Document", trigger: "validate_document_user_id" },
+          ]
+        : []),
       { table: "admin_config", trigger: "trigger_admin_config_updated_at" },
       { table: "model_config", trigger: "trigger_model_config_updated_at" },
       { table: "model_config", trigger: "trigger_ensure_single_default_model" },
-      ...(neon ? [{ table: "user", trigger: "on_user_deleted" }] : []),
+      ...(neon && hasUsers ? [{ table: "user", trigger: "on_user_deleted" }] : []),
     ];
 
     const triggerResult: VerificationResult = {

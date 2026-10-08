@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { verifyPassword as verifyScrypt } from "better-auth/crypto";
-import type { getDb } from "@/lib/db/queries/base";
+import type { authDb } from "@/lib/db/queries/base";
 
 // Password hashing runs inside Postgres (pgcrypto's crypt() with bcrypt), the
 // same way as the CloudRoot Worker (CloudRoot/worker/src/auth/password.js),
@@ -19,7 +19,7 @@ function isBcrypt(hash: string): boolean {
   return BCRYPT_PREFIX.test(hash);
 }
 
-type Db = ReturnType<typeof getDb>;
+type Db = NonNullable<typeof authDb>;
 
 type PasswordHashing = {
   hash: (password: string) => Promise<string>;

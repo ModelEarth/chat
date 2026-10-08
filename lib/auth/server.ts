@@ -2,7 +2,7 @@ import type { Session, User } from "./types";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/instance";
-import { db, isDbConfigured } from "@/lib/db/queries/base";
+import { authDb, isAuthDbConfigured } from "@/lib/db/queries/base";
 import { betterAuthAccount } from "@/lib/db/drizzle-schema";
 import { eq } from "drizzle-orm";
 
@@ -114,8 +114,8 @@ export async function isAdmin(user?: User | null): Promise<boolean> {
 export async function isEmailPasswordUser(): Promise<boolean> {
   try {
     const user = await getCurrentUser();
-    if (!user || !isDbConfigured || !db) return false;
-    const accounts = await db
+    if (!user || !isAuthDbConfigured || !authDb) return false;
+    const accounts = await authDb
       .select({ providerId: betterAuthAccount.providerId })
       .from(betterAuthAccount)
       .where(eq(betterAuthAccount.userId, user.id));
