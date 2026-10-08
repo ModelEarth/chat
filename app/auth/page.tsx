@@ -6,6 +6,7 @@ import { LocalEnvKeyPanel } from "@/components/local-env-key-panel";
 import { SupabaseKeyPanel } from "@/components/supabase-key-panel";
 import { getConfiguredSocialProviders } from "@/lib/auth/social-providers";
 import { getDbStatus } from "@/lib/auth/db-status";
+import { DeployInfo } from "@/components/deploy-info";
 
 function getErrorMessage(error: string, provider?: string): string | null {
   if (error === "account_not_linked") {
@@ -59,6 +60,7 @@ export default async function AuthPage({
           <EmailPasswordSignIn dbStatus={dbStatus} isVercel={isVercel} showDivider />
           <SupabaseKeyPanel />
           <LocalEnvKeyPanel />
+          <DeployInfo />
         </div>
       </div>
     </PublicLayout>

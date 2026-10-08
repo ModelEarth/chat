@@ -5,6 +5,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Baked in at build time. Every Vercel deploy is a new build, so this is
+    // the deploy time; shown at the bottom of /auth (components/deploy-info.tsx).
+    env: {
+        BUILD_TIME: new Date().toISOString(),
+        BUILD_COMMIT: (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7),
+    },
     async headers() {
         const devCorsHeaders = [
             { key: 'Access-Control-Allow-Origin', value: 'http://localhost:8887' },
