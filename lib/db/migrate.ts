@@ -44,6 +44,7 @@ const runMigrate = async () => {
       "0007_seed_data_model_config.sql",
       "0008_seed_data_xai_groq.sql",
       "0013_storage_setup.sql",
+      "0014_pgcrypto.sql",
     ];
 
     for (const file of migrationFiles) {

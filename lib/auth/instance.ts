@@ -8,6 +8,7 @@ import {
   betterAuthVerification,
 } from "@/lib/db/drizzle-schema";
 import { isSocialProviderConfigured } from "@/lib/auth/social-providers";
+import { databasePasswordHashing } from "@/lib/auth/password";
 
 function requireSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -57,6 +58,8 @@ function createAuth() {
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    // bcrypt in Postgres, shared with the CloudRoot Worker (see password.ts).
+    ...(isDbConfigured && db ? { password: databasePasswordHashing(db) } : {}),
   },
   account: {
     accountLinking: {
@@ -74,7 +77,9 @@ function createAuth() {
     },
   },
   advanced: {
-    generateId: () => crypto.randomUUID(),
+    // Under database: the adapter reads only advanced.database.generateId.
+    // UUIDs, since chat's own tables store user_id as uuid.
+    database: { generateId: () => crypto.randomUUID() },
     storeStateStrategy: "cookie",
     useSecureCookies: process.env.NODE_ENV === "production",
     cookieSameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
