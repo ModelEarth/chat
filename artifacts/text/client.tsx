@@ -1,6 +1,6 @@
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { Artifact } from "@/components/create-artifact";
-import { DiffView } from "@/components/diffview";
 import { DocumentSkeleton } from "@/components/document-skeleton";
 import {
   ClockRewind,
@@ -13,6 +13,13 @@ import {
 import { Editor } from "@/components/text-editor";
 import type { Suggestion } from "@/lib/db/drizzle-schema";
 import { getSuggestions } from "../actions";
+
+// Browser only: DiffView renders with Streamdown, which on the server would
+// bring in all of Shiki (see components/elements/response.tsx).
+const DiffView = dynamic(
+  () => import("@/components/diffview").then((m) => m.DiffView),
+  { ssr: false }
+);
 
 type TextArtifactMetadata = {
   suggestions: Suggestion[];

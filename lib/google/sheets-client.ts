@@ -1,7 +1,8 @@
 import "server-only";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { type sheets_v4, google } from "googleapis";
+// The Sheets-only client: "googleapis" bundles every Google API (~34 MB).
+import { auth, sheets, type sheets_v4 } from "@googleapis/sheets";
 
 // GOOGLE_SERVICE_KEY has been documented two different ways across this
 // project (README: a file path; the existing Rust implementation: the raw
@@ -45,12 +46,12 @@ export function getSheetsClient(): sheets_v4.Sheets | null {
   const credentials = loadServiceAccountCredentials();
   if (!credentials) return null;
 
-  const auth = new google.auth.GoogleAuth({
+  const googleAuth = new auth.GoogleAuth({
     credentials: credentials as { client_email?: string; private_key?: string },
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
-  cachedClient = google.sheets({ version: "v4", auth });
+  cachedClient = sheets({ version: "v4", auth: googleAuth });
   cachedCredentialsKey = credentialsKey;
   return cachedClient;
 }

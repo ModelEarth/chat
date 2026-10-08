@@ -5,8 +5,6 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TopNav } from "@/components/top-nav";
 import { getCurrentUser } from "@/lib/auth/server";
 
-export const experimental_ppr = true;
-
 export default async function ChatLayout({
   children,
 }: {
