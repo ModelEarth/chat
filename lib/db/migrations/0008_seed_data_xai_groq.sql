@@ -4,6 +4,12 @@
 -- Description: Adds xAI (Grok) and Groq model configs and agent entries
 -- =====================================================
 
+-- Allow the two new providers. Databases created before 0001_tables.sql
+-- listed them still have the three-provider check.
+ALTER TABLE model_config DROP CONSTRAINT IF EXISTS model_config_provider_check;
+ALTER TABLE model_config ADD CONSTRAINT model_config_provider_check
+  CHECK (provider IN ('google', 'openai', 'anthropic', 'xai', 'groq'));
+
 -- xAI Models
 INSERT INTO model_config (model_id, name, description, provider, is_active, is_default, thinking_enabled, input_pricing_per_million_tokens, output_pricing_per_million_tokens, metadata) VALUES
 ('grok-3',      'Grok 3',      'Most capable Grok model', 'xai', true,  true,  false, 3.0000, 15.0000, '{"contextWindow": 131072, "maxOutputTokens": 4096}'::jsonb),
@@ -18,7 +24,13 @@ INSERT INTO admin_config (config_key, config_data) VALUES
   "capabilities": {
     "fileInput": false
   },
-  "fileInputTypes": {}
+  "fileInputTypes": {},
+  "rateLimit": {
+    "perMinute": 4,
+    "perHour": 40,
+    "perDay": 150
+  },
+  "tools": {}
 }')
 ON CONFLICT (config_key) DO NOTHING;
 
@@ -36,6 +48,12 @@ INSERT INTO admin_config (config_key, config_data) VALUES
   "capabilities": {
     "fileInput": false
   },
-  "fileInputTypes": {}
+  "fileInputTypes": {},
+  "rateLimit": {
+    "perMinute": 4,
+    "perHour": 40,
+    "perDay": 150
+  },
+  "tools": {}
 }')
 ON CONFLICT (config_key) DO NOTHING;

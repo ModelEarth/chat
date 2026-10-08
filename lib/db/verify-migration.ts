@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { loadEnvironment } from "../env-loader";
+import { isNeonTarget } from "./migration-target";
 
 loadEnvironment();
 
@@ -16,6 +17,8 @@ const verifyMigration = async (): Promise<void> => {
 
   const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
   const results: VerificationResult[] = [];
+  // Neon versions of the migrations: see migrations/neon/.
+  const neon = isNeonTarget(process.env.POSTGRES_URL);
 
   console.log("🔍 Starting Database Verification...");
   console.log("");
@@ -73,12 +76,15 @@ const verifyMigration = async (): Promise<void> => {
 
     // 2. Verify Functions
     console.log("Checking functions...");
-    const expectedFunctions = [
+    const supabaseOnlyFunctions = [
       "get_user_role",
-      "validate_user_id",
-      "handle_auth_user_deletion",
       "get_current_user_usage_summary",
       "is_current_user_admin",
+    ];
+    const expectedFunctions = [
+      ...(neon ? [] : supabaseOnlyFunctions),
+      "validate_user_id",
+      "handle_auth_user_deletion",
       "update_admin_config_timestamp",
       "update_model_config_timestamp",
       "ensure_single_default_model_per_provider",
@@ -176,6 +182,7 @@ const verifyMigration = async (): Promise<void> => {
       { table: "admin_config", trigger: "trigger_admin_config_updated_at" },
       { table: "model_config", trigger: "trigger_model_config_updated_at" },
       { table: "model_config", trigger: "trigger_ensure_single_default_model" },
+      ...(neon ? [{ table: "user", trigger: "on_user_deleted" }] : []),
     ];
 
     const triggerResult: VerificationResult = {
@@ -214,54 +221,72 @@ const verifyMigration = async (): Promise<void> => {
     }
     results.push(triggerResult);
 
-    // 5. Verify RLS Policies
+    // 5. Verify RLS Policies (on Neon: RLS enabled, no policies)
     console.log("Checking RLS policies...");
-    const expectedPolicies = [
-      { table: "Chat", policy: "Users can read own chats" },
-      { table: "admin_config", policy: "Admins can read admin_config" },
-      {
-        table: "model_config",
-        policy: "Authenticated users can read model_config",
-      },
-      { table: "usage_logs", policy: "Users can read own usage_logs" },
-      { table: "error_logs", policy: "System can insert error_logs" },
-    ];
+    if (neon) {
+      const rlsResult: VerificationResult = { category: "RLS", passed: true, details: [] };
+      const off = await connection`
+        SELECT relname FROM pg_class
+        WHERE relnamespace = 'public'::regnamespace AND relkind = 'r'
+        AND relname IN ('Chat', 'Message_v2', 'Document', 'admin_config', 'usage_logs', 'error_logs')
+        AND NOT relrowsecurity
+      `;
+      for (const row of off) {
+        rlsResult.passed = false;
+        rlsResult.details.push(`❌ RLS not enabled on "${row.relname}"`);
+      }
+      if (rlsResult.passed) rlsResult.details.push("✅ RLS enabled (no policies; chat connects as the owner)");
+      results.push(rlsResult);
+    }
 
-    const policyResult: VerificationResult = {
-      category: "RLS Policies",
-      passed: true,
-      details: [],
-    };
+    if (!neon) {
+      const expectedPolicies = [
+        { table: "Chat", policy: "Users can read own chats" },
+        { table: "admin_config", policy: "Admins can read admin_config" },
+        {
+          table: "model_config",
+          policy: "Authenticated users can read model_config",
+        },
+        { table: "usage_logs", policy: "Users can read own usage_logs" },
+        { table: "error_logs", policy: "System can insert error_logs" },
+      ];
 
-    for (const { table, policy } of expectedPolicies) {
-      try {
-        const result = await connection`
-          SELECT EXISTS (
-            SELECT FROM pg_policies 
-            WHERE schemaname = 'public' 
-            AND tablename = ${table}
-            AND policyname = ${policy}
-          )
-        `;
+      const policyResult: VerificationResult = {
+        category: "RLS Policies",
+        passed: true,
+        details: [],
+      };
 
-        if (!result[0]?.exists) {
+      for (const { table, policy } of expectedPolicies) {
+        try {
+          const result = await connection`
+            SELECT EXISTS (
+              SELECT FROM pg_policies 
+              WHERE schemaname = 'public' 
+              AND tablename = ${table}
+              AND policyname = ${policy}
+            )
+          `;
+
+          if (!result[0]?.exists) {
+            policyResult.passed = false;
+            policyResult.details.push(
+              `❌ Policy "${policy}" missing on "${table}"`
+            );
+          }
+        } catch (error) {
           policyResult.passed = false;
           policyResult.details.push(
-            `❌ Policy "${policy}" missing on "${table}"`
+            `❌ Error checking policy "${policy}" on "${table}": ${error}`
           );
         }
-      } catch (error) {
-        policyResult.passed = false;
-        policyResult.details.push(
-          `❌ Error checking policy "${policy}" on "${table}": ${error}`
-        );
       }
-    }
 
-    if (policyResult.passed && policyResult.details.length === 0) {
-      policyResult.details.push("✅ All expected RLS policies exist");
+      if (policyResult.passed && policyResult.details.length === 0) {
+        policyResult.details.push("✅ All expected RLS policies exist");
+      }
+      results.push(policyResult);
     }
-    results.push(policyResult);
 
     // 6. Verify Seed Data
     console.log("Checking seed data...");

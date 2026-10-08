@@ -64,6 +64,20 @@ The schema uses database triggers to enforce referential integrity:
 
 3. **RLS Policies**: Row-level security ensures users only access their own data
 
+### On Neon
+
+On Neon, users are in BetterAuth's `"user"` table (CloudRoot
+`auth/db/0001_create_better_auth_tables.sql`), and `migrate.ts` runs the
+versions in `migrations/neon/` (see `migrations/README.md`):
+
+- `validate_user_id()` checks `"user"`, and `handle_auth_user_deletion()`
+  runs from an `on_user_deleted` trigger on `"user"`. `"user".id` is `text`
+  while chat's `user_id` columns are `uuid`, so these triggers stand in for
+  foreign keys here too.
+- RLS is enabled with no policies. chat connects as the database owner, which
+  RLS doesn't restrict, and checks access in `lib/auth/server.ts`; any other
+  role is denied every row.
+
 ## Verification
 
 After running migrations:

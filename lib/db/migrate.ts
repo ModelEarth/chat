@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 import { loadEnvironment } from "../env-loader";
+import { isNeonTarget, migrationsFor } from "./migration-target";
 
 loadEnvironment();
 
@@ -23,29 +24,24 @@ const runMigrate = async () => {
   }
 
   const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
+  const neon = isNeonTarget(process.env.POSTGRES_URL);
 
-  console.log("⏳ Running migrations...");
+  console.log(`⏳ Running migrations${neon ? " (Neon versions)" : ""}...`);
   console.log("📁 Migrations folder: ./lib/db/migrations");
 
   const start = Date.now();
 
   try {
-    // Run migrations in order
-    const migrationFiles = [
-      "0001_tables.sql",
-      "0002_functions.sql",
-      "0003_indexes.sql",
-      "0004_triggers.sql",
-      "0005_rls.sql",
-      "0006_seed_data_app_settings.sql",
-      "0006_seed_data_google.sql",
-      "0006_seed_data_openai.sql",
-      "0006_seed_data_anthropic.sql",
-      "0007_seed_data_model_config.sql",
-      "0008_seed_data_xai_groq.sql",
-      "0013_storage_setup.sql",
-      "0014_pgcrypto.sql",
-    ];
+    if (neon) {
+      const [{ exists }] = await connection`select to_regclass('public."user"') is not null as exists`;
+      if (!exists) {
+        throw new Error(
+          'BetterAuth\'s "user" table is missing. Run CloudRoot\'s auth/db/0001_create_better_auth_tables.sql (or automation/setup-neon.mjs) first.'
+        );
+      }
+    }
+
+    const migrationFiles = migrationsFor(neon);
 
     for (const file of migrationFiles) {
       console.log(`📄 Running ${file}...`);

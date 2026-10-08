@@ -51,6 +51,23 @@ When new migrations are added:
 
 4. **Super Admin** reviews and applies to production
 
+## Neon
+
+`migrate.ts` detects Neon from the `POSTGRES_URL` host (`*.neon.tech`);
+`MIGRATION_TARGET=neon` or `supabase` overrides it. On Neon it runs:
+
+| Supabase file | On Neon |
+|---|---|
+| `0002_functions.sql` | Runs, followed by `neon/0002_functions.sql`, which points the user functions at BetterAuth's `"user"` table and drops `get_user_role`, `is_current_user_admin` and `get_current_user_usage_summary` (they need Supabase's `auth.uid()`; chat doesn't call them) |
+| `0004_triggers.sql` | `neon/0004_triggers.sql`: the delete trigger is on `"user"` instead of `auth.users` |
+| `0005_rls.sql` | `neon/0005_rls.sql`: RLS enabled, no policies, no grants to Supabase roles |
+| `0013_storage_setup.sql` | Skipped: Supabase Storage |
+
+Every other file runs unchanged. BetterAuth's `"user"` table must exist
+first: CloudRoot's `auth/db/0001_create_better_auth_tables.sql`, or
+`automation/setup-neon.mjs`, which also runs it. `npm run db:verify` checks
+the Neon variant on a Neon database.
+
 ## Migration Naming Convention
 
 ```

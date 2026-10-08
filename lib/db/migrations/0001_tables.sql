@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS model_config (
     model_id VARCHAR(100) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     description TEXT,
-    provider VARCHAR(50) NOT NULL CHECK (provider IN ('google', 'openai', 'anthropic')),
+    provider VARCHAR(50) NOT NULL CHECK (provider IN ('google', 'openai', 'anthropic', 'xai', 'groq')),
     is_active BOOLEAN DEFAULT true,
     is_default BOOLEAN DEFAULT false,
     thinking_enabled BOOLEAN DEFAULT true,
