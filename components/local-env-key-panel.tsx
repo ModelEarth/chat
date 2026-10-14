@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CopyIcon } from "@/components/icons";
 import { toast } from "@/components/toast";
 
-// Same local-hostname definition used by chat/auth/js/auth-modal.js's
+// Same local-hostname definition used by the auth repo's auth-modal.js
 // isLocal check, so this panel and the social-button styling agree on
 // what counts as "local."
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);

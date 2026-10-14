@@ -21,11 +21,11 @@ When the user says **`start chat`**, first **ask the localhost user which mode t
 
 | Mode | Command (run from the webroot root) | Port | Serves |
 |---|---|---|---|
-| **webroot** | `nohup node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app **+** sibling static repos (`/localsite/`, `/team/`, `/chat/auth/`, …) |
+| **webroot** | `nohup node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app **+** sibling static repos (`/localsite/`, `/team/`, `/auth/`, …) |
 | **webroot + turbopack** | `nohup TURBOPACK=1 node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | same as webroot but with Turbopack HMR (may spike CPU/file handles on large webroot trees) |
 | **chat repo** | `nohup pnpm --prefix chat dev > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app only (Turbopack HMR, no static repos) |
 
-In **both** modes the chat app sits at the **server root** — there is no `/chat` repo prefix. `server.mjs` does not mount the chat repo under `/chat`; `/chat` is the chat-list route, `/chat/keys` and `/chat/auth` are static handlers, and the API is at `/api/...`.
+In **both** modes the chat app sits at the **server root** — there is no `/chat` repo prefix. `server.mjs` does not mount the chat repo under `/chat`; `/chat` is the chat-list route, `/chat/keys` and `/auth` (the auth repo) are static handlers, and the API is at `/api/...`.
 
 ```bash
 # Check the chosen port isn't already in use first:
@@ -324,24 +324,22 @@ Auth is provided by **better-auth**, integrated alongside (not replacing) the pr
 | `app/api/auth/*` | better-auth's own endpoints (`/sign-in/social`, `/get-session`, callbacks) |
 | `app/api/oauth/[provider]/route.ts` | **Navigation-based OAuth proxy** (incognito-safe — see below) |
 | `app/api/oauth/relay/route.ts` | Reads the session first-party after OAuth callback, returns identity in the URL hash |
-| `auth/js/auth-modal.js` | Vanilla-JS sign-in modal for **static** (non-Next.js) pages; calls the OAuth proxy via top-level navigation |
-| `auth/js/auth-plugin.js`, `auth/css/auth.css` | Supporting plugin + styles for the static modal |
 
-> **Why `chat/auth/`, not `chat/public/auth/`:** these are **pure-static, no-build** assets, served exactly like `chat/keys/`. Living under `public/` would make them reachable only through a running Next.js server (which strips `public/`), so a plain static file server (the webroot's Python server) couldn't serve them at a clean path. As a sibling of `chat/keys/`, they're served literally at `/chat/auth/...` by any static server, and `server.mjs` has a `/auth/*` + `/chat/auth/*` handler (mirroring its `/chat/keys/*` handler) for the unified server. Trade-off: a Vercel **root=chat** deployment must serve `chat/auth/` the same way it serves `chat/keys/` (not auto-served from outside `public/`).
+> **The vanilla sign-in widget isn't in this repo.** `auth-modal.js` and `auth-plugin.js`, for static (non-Next.js) pages, live in the separate [auth](https://github.com/ModelEarth/auth) repo (`public/js/`), a sibling submodule in the webroot. `server.mjs` serves them at `/auth/js/...`, with the auth repo's static sign-in pages (`auth/out`, once built) at `/auth/`.
 
-> **URL-path naming rule:** keep the term "betterauth"/"better-auth" **out of public URL paths**. The API mounts use generic `/api/auth/*` (your `app/api/auth/[...all]/route.ts`) and `/api/oauth/*`. Static client assets live under `chat/auth/` → served at `/chat/auth/...` (or `/auth/...` when the deploy root is chat), **not** `/betterauth/...`. The source folder `betterauth/` is only an import alias (`@/betterauth/auth`) and is never exposed as a URL.
+> **URL-path naming rule:** keep the term "betterauth"/"better-auth" **out of public URL paths**. The API mounts use generic `/api/auth/*` (your `app/api/auth/[...all]/route.ts`) and `/api/oauth/*`. Static client assets are served at `/auth/...` (from the auth repo), **not** `/betterauth/...`. The source folder `betterauth/` is only an import alias (`@/betterauth/auth`) and is never exposed as a URL.
 
 ### Static sign-in for non-React sites (the localsite dispatcher)
 
-Non-React sites across the webroot (team, localsite-based pages, etc.) do **not** ship their own auth UI. They call a single shared dispatcher, `showAuthModal()`, defined once in `localsite/js/localsite.js` (the universal include on every site). That dispatcher contains no auth logic — it looks up **where** the auth modal lives and loads it from this chat repo's `chat/auth/` (served at `/chat/auth/...`).
+Non-React sites across the webroot (team, localsite-based pages, etc.) do **not** ship their own auth UI. They call a single shared dispatcher, `showAuthModal()`, defined once in `localsite/js/localsite.js` (the universal include on every site). That dispatcher contains no auth logic — it looks up **where** the auth modal lives and loads it from the auth repo (served at `/auth/js/...`).
 
-The auth source is configured in **`support/site/config.yaml`** under the `auth:` block (`modal_url_*`, `plugin_url_*`, `api_url_*`, `source_repo`). `showAuthModal()` resolves it in this order: `window.webrootAuth` → the `auth:` block fetched from `/support/site/config.yaml` → built-in fallback (`/auth/js/auth-modal.js` at the site root, i.e. this repo). This indirection lets the auth source be repointed to a different repo later without editing any site code.
+The auth source is configured in **`support/site/config.yaml`** under the `auth:` block (`modal_url_*`, `plugin_url_*`, `api_url_*`, `source_repo`). `showAuthModal()` resolves it in this order: `window.webrootAuth` → the `auth:` block fetched from `/support/site/config.yaml` → built-in fallback (the auth repo's widget: the webroot's `auth/public/js/` on localhost, cloud.model.earth elsewhere). This indirection lets the auth source be repointed to a different repo later without editing any site code.
 
-**In-page launcher:** when localsite inserts its account panel (`template-main.html`, which holds `#accountPanelInserts`), `loadLocalTemplate()` calls `initAuthPlugin()`, which loads this repo's **`auth-plugin.js`** (`plugin_url_*` from `support/site/config.yaml`). The plugin injects the sign-in button + session state inline into `#accountPanelInserts` and opens the modal on click — so sign-in works **in-page**, not only as a popup. It's loaded only where the account panel exists, so header-less pages get no floating button.
+**In-page launcher:** when localsite inserts its account panel (`template-main.html`, which holds `#accountPanelInserts`), `loadLocalTemplate()` calls `initAuthPlugin()`, which loads the auth repo's **`auth-plugin.js`** (`plugin_url_*` from `support/site/config.yaml`). The plugin injects the sign-in button + session state inline into `#accountPanelInserts` and opens the modal on click — so sign-in works **in-page**, not only as a popup. It's loaded only where the account panel exists, so header-less pages get no floating button.
 
-**Path prefix:** from a host page served by the **webroot**, the chat app (modal, plugin, and `/api`) lives under **`/chat`** — e.g. `/chat/auth/js/auth-plugin.js`, `/chat/api`. The `/auth/...` and `/api/...` forms (no prefix) apply only when the deploy root **is** the chat repo itself (some Vercel deployments, and the chat-at-root unified dev server). `support/site/config.yaml`'s `*_development` values carry the `/chat` prefix; the `*_production` values point at the standalone chat deployment without it. Adjust per how the chat app is mounted.
+**Paths:** pages load the widget from `/auth/js/...` and call the sign-in API at `api_url_*` from `support/site/config.yaml`. In CloudRoot, `api_url_development` is the CloudRoot Worker run locally (`npm run dev` in `worker/`, http://localhost:3701/api), and production is the Worker at cloud.model.earth. While that Worker runs, `server.mjs` also passes `/api/auth/*` and `/api/oauth/*` to it (except chat's local env panels); otherwise chat's own sign-in API answers.
 
-**Do not reintroduce auth UI or a duplicate modal into `localsite/` or `team/`** — host the modal/plugin here and let sites reach them through `showAuthModal()` / the account panel.
+**Do not reintroduce auth UI or a duplicate modal into `localsite/` or `team/`** — host the modal/plugin in the auth repo and let sites reach them through `showAuthModal()` / the account panel.
 
 ### Cross-origin / incognito design (important)
 
@@ -434,7 +432,7 @@ See `DEPLOYMENT_GUIDE.md` for full steps including Supabase setup and env vars.
 
 **What's served:** only the Next.js chat app and its `public/` directory.
 
-**Known gap — static widget assets:** `chat/keys/key-manager.js`, `chat/keys/style.css`, and `chat/auth/js/auth-{modal,plugin}.js` are served by `server.mjs` locally but are not inside `chat/public/`, so Vercel will not serve them at `/keys/…` or `/chat/keys/…`. The React key manager page at `/key` works (Next.js route). Static embeds on non-Next.js pages that load `key-manager.js` directly will 404. Fix: copy those files into `chat/public/keys/` and `chat/public/auth/` as part of the build, or add Next.js API routes that stream them.
+**Known gap — static widget assets:** `chat/keys/key-manager.js` and `chat/keys/style.css` are served by `server.mjs` locally but are not inside `chat/public/`, so Vercel will not serve them at `/keys/…` or `/chat/keys/…`. The React key manager page at `/key` works (Next.js route). Static embeds on non-Next.js pages that load `key-manager.js` directly will 404. Fix: copy those files into `chat/public/keys/` as part of the build, or add Next.js API routes that stream them.
 
 ### Mode B — Root Directory = webroot root
 

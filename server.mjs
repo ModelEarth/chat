@@ -27,7 +27,8 @@
  */
 
 import { execFile } from 'node:child_process'
-import { createServer } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
+import { connect } from 'node:net'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
 import { createReadStream, statSync, existsSync } from 'node:fs'
@@ -399,10 +400,63 @@ async function tryInternalApi(req, pathname, res) {
   return false
 }
 
+// ── Sign-in API from the CloudRoot Worker ───────────────────────────────────
+// When the Worker runs locally (`npm run dev` in worker/, port 3701), sign-in
+// requests here go to it, so localhost uses the same sign-in code as
+// cloud.model.earth: the auth repo's /auth/ pages, the widget and chat's own
+// pages. It shares the env file's database and BETTER_AUTH_SECRET with chat,
+// so sessions work in both. Without it, chat's own API answers as before.
+// chat's local-only env panels stay with chat.
+const AUTH_WORKER = new URL(process.env.AUTH_WORKER_URL || 'http://localhost:3701')
+const CHAT_ONLY_AUTH = new Set(['/api/auth/local-env-values', '/api/auth/supabase-env-values'])
+let workerCheck = { at: 0, up: false }
+
+function isWorkerAuthPath(pathname) {
+  return (pathname.startsWith('/api/auth/') || pathname.startsWith('/api/oauth/')) && !CHAT_ONLY_AUTH.has(pathname)
+}
+
+// Whether the Worker is listening, checked at most every 5 seconds.
+function authWorkerUp() {
+  if (Date.now() - workerCheck.at < 5000) return Promise.resolve(workerCheck.up)
+  return new Promise((done) => {
+    const socket = connect({ host: AUTH_WORKER.hostname, port: Number(AUTH_WORKER.port || 80) })
+    const finish = (up) => { socket.destroy(); workerCheck = { at: Date.now(), up }; done(up) }
+    socket.setTimeout(300, () => finish(false))
+    socket.once('connect', () => finish(true))
+    socket.once('error', () => finish(false))
+  })
+}
+
+function proxyToAuthWorker(req, res) {
+  const upstream = httpRequest({
+    host: AUTH_WORKER.hostname,
+    port: AUTH_WORKER.port,
+    method: req.method,
+    path: req.url,
+    headers: { ...req.headers, host: AUTH_WORKER.host },
+  }, (response) => {
+    res.writeHead(response.statusCode, response.headers)
+    response.pipe(res)
+  })
+  upstream.on('error', () => {
+    workerCheck = { at: 0, up: false }
+    if (!res.headersSent) { res.statusCode = 502; res.end('Sign-in service unavailable') }
+  })
+  req.pipe(upstream)
+}
+
 /** Returns true if the request was handled as a static file. */
 function tryStatic(pathname, res) {
   const segments = pathname.split('/').filter(Boolean)
   const top = segments[0]
+
+  // Browsers resolve "..", but a raw request can keep it, and join() would then
+  // climb out of the webroot (e.g. to ../safe/*.env). Refuse those paths.
+  if (segments.includes('..')) {
+    res.statusCode = 400
+    res.end('Bad request')
+    return true
+  }
 
   // /keys/ and /chat/keys — both serve the static key manager widget (localsite nav).
   const isChatKeysRoute = top === 'chat' && segments[1] === 'keys'
@@ -424,21 +478,27 @@ function tryStatic(pathname, res) {
     return false
   }
 
-  // /auth/ and /chat/auth — static auth widget (modal + plugin), like /chat/keys.
-  // Pure static, no build: the host page loads /chat/auth/js/auth-{modal,plugin}.js.
+  // /auth/ and /chat/auth — the webroot's auth submodule: the sign-in widget
+  // (auth/public/js/auth-{modal,plugin}.js) and, once built, the sign-in
+  // pages' static export (auth/out). Without the export, /auth itself falls
+  // through to chat's own Next.js page.
   const isChatAuthRoute = top === 'chat' && segments[1] === 'auth'
   const isAuthRoute = top === 'auth' || isChatAuthRoute
 
   if (isAuthRoute) {
-    // Strip the leading path prefix to get segments relative to chat/auth/
     const relativeSegments = isChatAuthRoute ? segments.slice(2) : segments.slice(1)
-    if (relativeSegments.length === 0) return false
-
-    const filePath = join(CHAT_DIR, 'auth', ...relativeSegments)
-    try {
-      const stat = statSync(filePath)
-      if (stat.isFile()) { serveFile(filePath, res); return true }
-    } catch { /* not found */ }
+    for (const dir of ['public', 'out']) {
+      const filePath = join(WEBROOT, 'auth', dir, ...relativeSegments)
+      try {
+        const stat = statSync(filePath)
+        if (stat.isFile()) { serveFile(filePath, res); return true }
+        const idx = join(filePath, 'index.html')
+        if (stat.isDirectory() && existsSync(idx)) {
+          if (!pathname.endsWith('/')) { redirect(pathname + '/', res); return true }
+          serveFile(idx, res); return true
+        }
+      } catch { /* not found */ }
+    }
     return false
   }
 
@@ -507,6 +567,10 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
+      if (isWorkerAuthPath(parsedUrl.pathname) && await authWorkerUp()) {
+        proxyToAuthWorker(req, res)
+        return
+      }
       if (!(await tryInternalApi(req, parsedUrl.pathname, res)) && !tryStatic(parsedUrl.pathname, res)) {
         await handle(req, res, parsedUrl)
       }

@@ -54,3 +54,6 @@ __pycache__/
 # Cloudflare deploy
 .open-next/
 .wrangler/
+
+# localsite copied in by CloudRoot's Vercel build (vercel.json)
+/public/localsite
