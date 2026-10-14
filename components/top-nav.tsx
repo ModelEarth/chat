@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 import { toast } from "@/components/toast";
 import { siteTitle } from "@/lib/site";
+import { useSiteConfig, useSiteTitlePrefix } from "@/lib/site-config";
 
 interface TopNavProps {
   isWebroot: boolean;
@@ -22,6 +23,10 @@ export function TopNav({ isWebroot, isLoggedIn: initialIsLoggedIn = false }: Top
   const { data: session, isPending } = authClient.useSession();
   const isLoggedIn = isPending ? initialIsLoggedIn : !!session?.user;
 
+  // The webroot site's logo and title, from support/site/config.yaml.
+  const site = useSiteConfig();
+  useSiteTitlePrefix(site?.title);
+
   async function handleSignOut() {
     try {
       await authClient.signOut();
@@ -35,8 +40,13 @@ export function TopNav({ isWebroot, isLoggedIn: initialIsLoggedIn = false }: Top
   return (
     <nav className="fixed top-0 right-0 left-0 z-50 border-b bg-background/80 backdrop-blur-md">
       <div className="flex w-full items-center gap-4 px-4 py-4">
-        <div className="shrink-0 font-bold text-xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-          {siteTitle}
+        <div className="flex shrink-0 items-center gap-2">
+          {site?.logo && (
+            <img src={site.logo} alt={site.title ?? ""} className="h-7 w-auto" />
+          )}
+          <div className="font-bold text-xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            {siteTitle}
+          </div>
         </div>
 
         {/* Overflow container: spacer pushes buttons right; clipping from the right

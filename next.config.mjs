@@ -21,6 +21,18 @@ const nextConfig = {
         if (process.env.NODE_ENV === 'production') return [];
         return [{ source: '/api/auth/:path*', headers: devCorsHeaders }];
     },
+    // Where chat is deployed on its own (Vercel), there's no localsite folder,
+    // so /localsite/ is proxied from model.earth. Fallback rewrites only apply
+    // when no page or file matches; locally, chat/server.mjs serves the
+    // webroot's localsite before Next.js sees the request.
+    async rewrites() {
+        return {
+            fallback: [
+                { source: '/localsite', destination: 'https://model.earth/localsite/' },
+                { source: '/localsite/:path*', destination: 'https://model.earth/localsite/:path*' },
+            ],
+        };
+    },
     // ⚠️ FIXME: PPR requires Next.js canary. Re-enable after upgrading from 15.5.9 stable
     // experimental: {
     //   ppr: true,
