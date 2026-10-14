@@ -22,13 +22,16 @@ const nextConfig = {
         return [{ source: '/api/auth/:path*', headers: devCorsHeaders }];
     },
     // Where chat is deployed on its own (Vercel), there's no localsite folder,
-    // so /localsite/ is proxied from model.earth. Fallback rewrites only apply
-    // when no page or file matches; locally, chat/server.mjs serves the
-    // webroot's localsite before Next.js sees the request.
+    // so /localsite/ is proxied from model.earth. The bare /localsite rule runs
+    // before the routes, since app/[wikiSlug] would otherwise claim it; deeper
+    // paths fall back once no page or file matches. Locally, chat/server.mjs
+    // serves the webroot's localsite before Next.js sees the request.
     async rewrites() {
         return {
-            fallback: [
+            beforeFiles: [
                 { source: '/localsite', destination: 'https://model.earth/localsite/' },
+            ],
+            fallback: [
                 { source: '/localsite/:path*', destination: 'https://model.earth/localsite/:path*' },
             ],
         };
