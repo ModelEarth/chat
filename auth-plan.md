@@ -25,9 +25,9 @@ This is a planning/notes doc, written before `/compact`, to capture what this se
 
 **Static, no-build widgets (usable by any plain HTML page, not just `chat`):**
 - `chat/auth/js/auth-modal.js`, `auth-plugin.js`, `auth/css/auth.css` — vanilla JS sign-in modal + inline account-panel plugin. Already designed to be consumed by pages with **no build step and no framework** — same philosophy as `chat/keys/key-manager.js` and the prebuilt-bundle pattern in `chat/packages/github-components/` (a Vite IIFE bundle **committed to git**, so `git pull` alone gives a working artifact, no build required to consume it).
-- Dispatch layer: `localsite/js/localsite.js`'s `showAuthModal()` — every non-React site in the webroot calls this one function; it contains **no auth logic itself**, it just resolves *where* the modal lives and loads it. Resolution order: `window.webrootAuth` → the `auth:` block in `home/webroot.yaml` (fetched at runtime) → hardcoded fallback path.
+- Dispatch layer: `localsite/js/localsite.js`'s `showAuthModal()` — every non-React site in the webroot calls this one function; it contains **no auth logic itself**, it just resolves *where* the modal lives and loads it. Resolution order: `window.webrootAuth` → the `auth:` block in `support/site/config.yaml` (fetched at runtime) → hardcoded fallback path.
 
-**The existing indirection layer — `home/webroot.yaml`:**
+**The existing indirection layer — `support/site/config.yaml`:**
 ```yaml
 auth:
   enabled: true
@@ -92,11 +92,11 @@ Caveat: this is reasoning from the docs and this session's earlier findings, not
 4. **Do the UI pages (`/auth`, `/login`, `/register`) move too, or stay per-consumer?** They're fairly app-specific today (e.g. `/auth` renders the localhost-only key-copy panel, which is very chat-specific). Likely only the *form components* (`EmailPasswordSignIn`, `SocialLoginButtons`, `DbStatusBanner`) and the underlying hooks/context move; the page shells stay in each consuming app.
 5. **Shared database or per-site database?** If multiple independently-deployed sites each build `auth`'s routes into their own app, do they point at the *same* Postgres instance (shared user accounts/sessions across sites) or does each site get its own DB (separate accounts per site, `auth` is just shared *code*, not a shared *service*)? This is a product decision as much as a technical one, and changes what `BETTER_AUTH_SECRET`/`ALLOWED_ORIGINS`/session-cookie scoping needs to look like across sites.
 6. **Finish the bearer-token relay** (the documented-but-unbuilt gap from `chat/AGENTS.md`) before leaning on Option B for any real (non-cosmetic) privileged action from a bare static site. Right now only the unsigned display-name hash works cross-origin; nothing privileged does.
-7. **Migration sequencing for the `chat/auth/` path collision** (above) — pick one of the two resolutions before starting, since it affects git history and the `home/webroot.yaml` cutover moment together.
+7. **Migration sequencing for the `chat/auth/` path collision** (above) — pick one of the two resolutions before starting, since it affects git history and the `support/site/config.yaml` cutover moment together.
 8. **Env var story across repos**: the local env file (see `automation/paths.yaml`) currently holds one set of OAuth credentials for one better-auth instance. Once `auth`'s routes get built into multiple independent apps/deployments, each needs its own `BETTER_AUTH_SECRET` (never shared) and its own `ALLOWED_ORIGINS`, but *could* reasonably share the same OAuth app client ID/secret (Google/GitHub/etc. client registrations aren't inherently per-deployment) if using Option A with a shared DB. Worth a clear "what's shared vs. what's per-deployment" table once the shared-DB question (#5) is settled.
 
 ---
 
 ## Recommendation (tentative, not yet validated)
 
-Start with **Option A only** (embeddable source, built into each Next.js consumer) for `chat` and any future Next.js sites, nested as a submodule *inside* `chat` at a path that doesn't collide with today's `chat/auth/` static folder. Defer Option B (a remotely-hosted instance for bare static sites) until the bearer-token relay is actually built — until then, bare static sites keep working exactly as they do today (pointed at chat's deployment via `webroot.yaml`), just with `source_repo` eventually repointed once the static widget files themselves move into the new repo.
+Start with **Option A only** (embeddable source, built into each Next.js consumer) for `chat` and any future Next.js sites, nested as a submodule *inside* `chat` at a path that doesn't collide with today's `chat/auth/` static folder. Defer Option B (a remotely-hosted instance for bare static sites) until the bearer-token relay is actually built — until then, bare static sites keep working exactly as they do today (pointed at chat's deployment via `support/site/config.yaml`), just with `source_repo` eventually repointed once the static widget files themselves move into the new repo.

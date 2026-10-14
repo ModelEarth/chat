@@ -26,7 +26,7 @@ Do not commit automatically while implementing this plan.
 - Auth backend is better-auth: `betterauth/auth.ts` (full, DB-backed), `betterauth/auth-edge.ts` (stateless, no DB, used by edge middleware), `betterauth/client.ts` (React client).
 - OAuth provider credential env vars (each provider auto-enables only when **both** are set) — six pairs: `GOOGLE_CLIENT_ID`/`SECRET`, `GITHUB_CLIENT_ID`/`SECRET`, `LINKEDIN_CLIENT_ID`/`SECRET`, `MICROSOFT_CLIENT_ID`/`SECRET`, `DISCORD_CLIENT_ID`/`SECRET`, `FACEBOOK_CLIENT_ID`/`SECRET`.
 - `POSTGRES_URL` is optional and backend-agnostic — Supabase is "one supported database, not the only one." No-DB mode already exists (`AUTH_MODE=stateless` / no `POSTGRES_URL`) and degrades gracefully.
-- Non-secret settings belong in `home/webroot.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) / Vercel env vars in production.
+- Non-secret settings belong in `support/site/config.yaml`; secrets (`BETTER_AUTH_SECRET`, OAuth client secrets, `POSTGRES_URL`) belong in the local env file (see `automation/paths.yaml`) / Vercel env vars in production.
 - There's a separate, unrelated key system for AI provider keys (browser-encrypted `localStorage['settings_api-keys']`, see `keys/PLAN.md`) — **not** to be conflated with these server-side OAuth/DB secrets. Project 1's "copy keys to Vercel" panel is about *server* env vars, not browser-stored AI keys.
 
 ## Current-code findings (research complete)
