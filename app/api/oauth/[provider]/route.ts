@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { isAllowedRedirect } from "@/lib/auth/allowed-origins";
 
 const VALID_PROVIDERS = new Set([
   "google",
@@ -8,17 +9,6 @@ const VALID_PROVIDERS = new Set([
   "discord",
   "facebook",
 ]);
-
-function getAllowedOrigins(): string[] {
-  if (process.env.ALLOWED_ORIGINS) {
-    return process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim());
-  }
-  if (process.env.NODE_ENV !== "production") {
-    // 3700 = node server; 8887/8888/8889 = static webroot servers
-    return ["http://localhost:3700", "http://localhost:8887", "http://localhost:8888", "http://localhost:8889"];
-  }
-  return [];
-}
 
 // GET /api/oauth/:provider?redirect=<url>
 //
@@ -49,8 +39,7 @@ export async function GET(
     return new NextResponse("Invalid redirect URL", { status: 400 });
   }
 
-  const allowedOrigins = getAllowedOrigins();
-  if (allowedOrigins.length > 0 && !allowedOrigins.includes(redirectOrigin)) {
+  if (!isAllowedRedirect(redirect, request.nextUrl.origin)) {
     return new NextResponse("Redirect URL not in allowed origins", {
       status: 403,
     });

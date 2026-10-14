@@ -55,5 +55,6 @@ __pycache__/
 .open-next/
 .wrangler/
 
-# localsite copied in by CloudRoot's Vercel build (vercel.json)
+# localsite and the sign-in widget, copied in by CloudRoot's Vercel build (vercel.json)
 /public/localsite
+/public/auth

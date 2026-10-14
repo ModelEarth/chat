@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/instance";
+import { isAllowedRedirect } from "@/lib/auth/allowed-origins";
 
 // GET /api/oauth/relay?redirect=<original-page-url>
 //
@@ -15,6 +16,10 @@ export async function GET(request: NextRequest) {
 
   if (!redirect) {
     return new NextResponse("Missing redirect parameter", { status: 400 });
+  }
+  // The user's details go in the redirect, so only to this site or an allowed origin.
+  if (!isAllowedRedirect(redirect, request.nextUrl.origin)) {
+    return new NextResponse("Redirect URL not in allowed origins", { status: 403 });
   }
 
   let destination = redirect;

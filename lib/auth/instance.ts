@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/drizzle-schema";
 import { isSocialProviderConfigured } from "@/lib/auth/social-providers";
 import { databasePasswordHashing } from "@/lib/auth/password";
+import { allowedOrigins } from "@/lib/auth/allowed-origins";
 
 function requireSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -28,14 +29,10 @@ function resolveBaseURL(): string {
 }
 
 function resolveTrustedOrigins(): string[] {
-  if (process.env.ALLOWED_ORIGINS) {
-    return process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim());
-  }
-  if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== 'phase-production-build') {
+  if (!process.env.ALLOWED_ORIGINS && process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== 'phase-production-build') {
     throw new Error("ALLOWED_ORIGINS is required in production");
   }
-  // 3700 = node server; 8887/8888/8889 = static webroot servers whose pages load the auth modal
-  return ["http://localhost:3700", "http://localhost:8887", "http://localhost:8888", "http://localhost:8889"];
+  return allowedOrigins();
 }
 
 function createAuth() {

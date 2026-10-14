@@ -1,0 +1,15 @@
+# Site config for chat deployed on its own (Vercel with chat as the root).
+# localsite.js reads /support/site/config.yaml. In a webroot, chat/server.mjs
+# serves the webroot's own support/site/config.yaml instead, and CloudRoot's
+# Vercel build copies CloudRoot's over this one.
+#
+# The sign-in widget's script comes from the CloudRoot Worker, and its API is
+# chat's own /api, so the session cookie stays on this site.
+
+auth:
+  plugin_url_development: https://cloud.model.earth/auth/js/auth-plugin.js
+  modal_url_development: https://cloud.model.earth/auth/js/auth-modal.js
+  api_url_development: /api
+  plugin_url_production: https://cloud.model.earth/auth/js/auth-plugin.js
+  modal_url_production: https://cloud.model.earth/auth/js/auth-modal.js
+  api_url_production: /api
