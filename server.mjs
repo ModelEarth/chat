@@ -2,16 +2,14 @@
 /**
  * Unified webroot development server.
  *
- * Boots the Next.js chat app, mounts the sibling Sanity Next.js site,
- * and serves sibling webroot static repos from a single port.
+ * Boots the Next.js chat app and serves sibling webroot static repos
+ * from a single port.
  *
  * The chat app occupies the server root (no path prefix):
  *   /              → chat home
  *   /chat          → chat list / new chat
  *   /chat/[id]     → conversation
  *   /settings      → settings
- *   /sanity/       → mounted Sanity site
- *   /sanity/admin  → Sanity Studio
  *
  * Static repos are served from the webroot filesystem at their own paths:
  *   /localsite/    /team/    /requests/    /realitystream/    etc.
@@ -28,9 +26,8 @@
  * instead, which uses the Next.js default bundler.
  */
 
-import { spawn, execFile } from 'node:child_process'
-import { createServer, request as proxyRequest } from 'node:http'
-import { connect as connectSocket } from 'node:net'
+import { execFile } from 'node:child_process'
+import { createServer } from 'node:http'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
 import { createReadStream, statSync, existsSync } from 'node:fs'
@@ -39,14 +36,12 @@ import { freemem, totalmem, loadavg } from 'node:os'
 import { getHeapStatistics } from 'node:v8'
 import { fileURLToPath } from 'node:url'
 import next from 'next'
-import { prepareSanityRuntime } from './sanity/prepare-runtime.mjs'
 import { readEnvFileSetting } from './lib/parse-env-file-setting.mjs'
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 
 const CHAT_DIR = dirname(fileURLToPath(import.meta.url))  // .../webroot/chat
 const WEBROOT  = resolve(CHAT_DIR, '..')                   // .../webroot
-const SANITY_SOURCE_DIR = join(WEBROOT, 'sanity')
 const AUTOMATION_DIR = join(WEBROOT, 'automation')
 
 // ── Environment ──────────────────────────────────────────────────────────────
@@ -126,13 +121,7 @@ process.env.SERVER_KEYS_JSON = JSON.stringify(
 // ── Static file serving ──────────────────────────────────────────────────────
 
 // Directories in the webroot that are reserved for Next.js — never served statically.
-const NEXTJS_DIRS = new Set(['chat', 'key', 'sanity'])
-const SANITY_BASE_PATH = '/sanity'
-const SANITY_REQUIRED_ENV = [
-  'NEXT_PUBLIC_SANITY_PROJECT_ID',
-  'NEXT_PUBLIC_SANITY_DATASET',
-  'SANITY_API_READ_TOKEN',
-]
+const NEXTJS_DIRS = new Set(['chat', 'key'])
 
 const MIME_TYPES = {
   '.html':  'text/html; charset=utf-8',
@@ -173,14 +162,6 @@ function sendJson(res, statusCode, data) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.end(JSON.stringify(data))
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
 }
 
 function getServerPublicKeyJwk() {
@@ -315,7 +296,6 @@ async function tryInternalApi(req, pathname, res) {
       hostname: HOSTNAME,
       chatRoot: '/',
       chatRoutes: ['/chat', '/chat/keys/', '/settings'],
-      sanityMount: SANITY_BASE_PATH,
       staticRoots: ['/localsite/', '/team/', '/requests/', '/realitystream/', '/data-pipeline/', '/home/'],
       cwd: CHAT_DIR,
       webroot: WEBROOT,
@@ -378,11 +358,6 @@ async function tryInternalApi(req, pathname, res) {
   if (pathname === '/api/server-keys' && req.method === 'GET') {
     const keys = process.env.SERVER_KEYS_JSON ? JSON.parse(process.env.SERVER_KEYS_JSON) : []
     sendJson(res, 200, keys)
-    return true
-  }
-
-  if (pathname === '/api/sanity-status' && req.method === 'GET') {
-    sendJson(res, 200, sanityState)
     return true
   }
 
@@ -511,263 +486,11 @@ function tryStatic(pathname, res) {
   return false
 }
 
-function shouldProxyToSanity(pathname) {
-  return pathname === SANITY_BASE_PATH || pathname.startsWith(`${SANITY_BASE_PATH}/`)
-}
-
-function renderSanityFallbackPage() {
-  const missingVars = sanityState.missingVars.map((name) => `<li><code>${escapeHtml(name)}</code></li>`).join('')
-  const startupMessage = sanityState.startupError
-    ? `<p><strong>Startup status:</strong> ${escapeHtml(sanityState.startupError)}</p>`
-    : '<p><strong>Startup status:</strong> Sanity is not mounted yet.</p>'
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sanity Mount Status</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #f4f1ea;
-      --panel: rgba(255,255,255,0.82);
-      --text: #1f2937;
-      --muted: #5b6472;
-      --accent: #0f766e;
-      --border: rgba(15,118,110,0.18);
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #111827;
-        --panel: rgba(17,24,39,0.84);
-        --text: #e5e7eb;
-        --muted: #9ca3af;
-        --accent: #5eead4;
-        --border: rgba(94,234,212,0.2);
-      }
-    }
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, sans-serif;
-      background: radial-gradient(circle at top, rgba(15,118,110,0.12), transparent 40%), var(--bg);
-      color: var(--text);
-    }
-    main {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 32px 20px 64px;
-    }
-    .panel {
-      background: var(--panel);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      padding: 22px 24px;
-      box-shadow: 0 18px 50px rgba(0,0,0,0.08);
-      margin-top: 18px;
-    }
-    h1, h2 { margin: 0 0 10px; }
-    p, li { line-height: 1.55; color: var(--muted); }
-    code {
-      background: rgba(127,127,127,0.14);
-      border-radius: 8px;
-      padding: 2px 6px;
-      color: var(--text);
-    }
-    pre {
-      overflow: auto;
-      background: rgba(127,127,127,0.12);
-      border-radius: 14px;
-      padding: 14px;
-      color: var(--text);
-    }
-    a { color: var(--accent); }
-  </style>
-</head>
-<body>
-  <main>
-    <div class="panel">
-      <h1>Sanity Mount Pending</h1>
-      <p>The combined chat server is running, but the mounted Sanity app is not currently available.</p>
-      ${startupMessage}
-    </div>
-    <div class="panel">
-      <h2>What Works Now</h2>
-      <p>The chat app on <code>/</code> and the rest of the webroot continue running normally. This page is served by <code>chat/server.mjs</code> as a graceful fallback for <code>/sanity</code>.</p>
-    </div>
-    <div class="panel">
-      <h2>Missing Config</h2>
-      ${missingVars
-        ? `<ul>${missingVars}</ul>`
-        : '<p>No required Sanity env vars are missing. If startup still fails, check whether the values are valid.</p>'}
-      <p>Expected local source: the env file at the path in <code>automation/paths.yaml</code></p>
-    </div>
-    <div class="panel">
-      <h2>Expected Values</h2>
-      <pre>NEXT_PUBLIC_SANITY_PROJECT_ID=your_sanity_project_id
-NEXT_PUBLIC_SANITY_DATASET=production
-SANITY_API_READ_TOKEN=your_sanity_viewer_token
-NEXT_PUBLIC_BASE_URL=http://localhost:3700/sanity</pre>
-      <p>Mount path injection is handled automatically by chat and does not need to be stored in the upstream <code>sanity/</code> repo.</p>
-    </div>
-    <div class="panel">
-      <h2>Local Guidance</h2>
-      <p><a href="/chat/sanity/README.md">chat/sanity/README.md</a></p>
-      <p>The upstream repo remains untouched in the local <code>sanity/</code> submodule.</p>
-    </div>
-  </main>
-</body>
-</html>`
-}
-
-function serveSanityFallback(res) {
-  res.statusCode = 200
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.end(renderSanityFallbackPage())
-}
-
-function proxyToSanity(req, res) {
-  if (!sanityState.running) {
-    serveSanityFallback(res)
-    return
-  }
-  const upstream = proxyRequest(
-    {
-      hostname: HOSTNAME,
-      port: SANITY_PORT,
-      method: req.method,
-      path: req.url,
-      headers: {
-        ...req.headers,
-        host: `${HOSTNAME}:${SANITY_PORT}`,
-      },
-    },
-    (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers)
-      upstreamRes.pipe(res)
-    }
-  )
-
-  upstream.on('error', (error) => {
-    console.error('Sanity proxy error:', error)
-    sanityState.running = false
-    sanityState.startupError = `Proxy failed: ${error.message}`
-    serveSanityFallback(res)
-  })
-
-  req.pipe(upstream)
-}
-
-function proxySanityUpgrade(req, socket, head) {
-  if (!sanityState.running) {
-    socket.destroy()
-    return
-  }
-  const upstream = connectSocket(SANITY_PORT, HOSTNAME, () => {
-    const headerLines = Object.entries(req.headers)
-      .filter(([key]) => key.toLowerCase() !== 'host')
-      .flatMap(([key, value]) => {
-        if (Array.isArray(value)) return value.map((item) => `${key}: ${item}`)
-        return value === undefined ? [] : [`${key}: ${value}`]
-      })
-
-    upstream.write(
-      [
-        `${req.method} ${req.url} HTTP/${req.httpVersion}`,
-        ...headerLines,
-        `host: ${HOSTNAME}:${SANITY_PORT}`,
-        '',
-        '',
-      ].join('\r\n')
-    )
-
-    if (head?.length) upstream.write(head)
-    socket.pipe(upstream).pipe(socket)
-  })
-
-  upstream.on('error', (error) => {
-    console.error('Sanity upgrade proxy error:', error)
-    socket.destroy()
-  })
-
-  socket.on('error', () => upstream.destroy())
-}
-
 // ── Next.js ──────────────────────────────────────────────────────────────────
 
 const PORT     = parseInt(process.env.PORT || '3700', 10)
-const SANITY_PORT = parseInt(process.env.SANITY_PORT || '3701', 10)
 const HOSTNAME = 'localhost'
 const dev      = process.env.NODE_ENV !== 'production'
-const sanityState = {
-  enabled: existsSync(join(SANITY_SOURCE_DIR, 'package.json')),
-  configured: false,
-  running: false,
-  mountPath: SANITY_BASE_PATH,
-  sourceDir: SANITY_SOURCE_DIR,
-  missingVars: [],
-  startupError: '',
-}
-
-function getMissingSanityVars() {
-  return SANITY_REQUIRED_ENV.filter((name) => !isRealKey(process.env[name]))
-}
-
-async function startSanityDevServer() {
-  if (!dev || !sanityState.enabled) return null
-
-  sanityState.missingVars = getMissingSanityVars()
-  sanityState.configured = sanityState.missingVars.length === 0
-  if (!sanityState.configured) {
-    sanityState.startupError = `Missing required Sanity env vars: ${sanityState.missingVars.join(', ')}`
-    console.warn(`[sanity] ${sanityState.startupError}`)
-    return null
-  }
-
-  const sanityRuntimeDir = await prepareSanityRuntime()
-  if (!sanityRuntimeDir) return null
-
-  console.log(`[sanity] Starting Next.js site on http://${HOSTNAME}:${SANITY_PORT}${SANITY_BASE_PATH}`)
-
-  const child = spawn(
-    'bun',
-    ['run', 'dev', '--', '--hostname', HOSTNAME, '--port', String(SANITY_PORT)],
-    {
-      cwd: sanityRuntimeDir,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_BASE_PATH: SANITY_BASE_PATH,
-        NEXT_PUBLIC_BASE_URL:
-          process.env.SANITY_PUBLIC_BASE_URL ||
-          process.env.NEXT_PUBLIC_BASE_URL ||
-          `http://${HOSTNAME}:${PORT}${SANITY_BASE_PATH}`,
-      },
-    }
-  )
-
-  child.once('error', (error) => {
-    sanityState.running = false
-    sanityState.startupError = error.message
-    console.error('[sanity] Failed to start dev server:', error)
-  })
-
-  child.once('exit', (code, signal) => {
-    sanityState.running = false
-    if (signal || code) {
-      sanityState.startupError = `Sanity dev server exited (${signal || `code ${code}`})`
-    }
-    if (signal || code) {
-      console.error(`[sanity] Dev server exited (${signal || `code ${code}`})`)
-    }
-  })
-
-  sanityState.running = true
-  sanityState.startupError = ''
-
-  return child
-}
 
 // hostname + port must be passed so Next.js binds HMR WebSockets correctly.
 // Webpack is the default for the unified webroot server: Turbopack's file watcher
@@ -777,15 +500,6 @@ async function startSanityDevServer() {
 const useTurbopack = process.env.TURBOPACK === '1'
 const app    = next({ dev, dir: CHAT_DIR, hostname: HOSTNAME, port: PORT, ...(useTurbopack ? {} : { webpack: true }) })
 const handle = app.getRequestHandler()
-const sanityProcess = await startSanityDevServer()
-
-function stopSanityDevServer() {
-  if (sanityProcess && !sanityProcess.killed) sanityProcess.kill('SIGTERM')
-}
-
-process.once('SIGINT', stopSanityDevServer)
-process.once('SIGTERM', stopSanityDevServer)
-process.once('exit', stopSanityDevServer)
 
 app.prepare().then(() => {
   const upgradeHandler = app.getUpgradeHandler?.()
@@ -793,10 +507,6 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
-      if (shouldProxyToSanity(parsedUrl.pathname)) {
-        proxyToSanity(req, res)
-        return
-      }
       if (!(await tryInternalApi(req, parsedUrl.pathname, res)) && !tryStatic(parsedUrl.pathname, res)) {
         await handle(req, res, parsedUrl)
       }
@@ -808,11 +518,6 @@ app.prepare().then(() => {
   })
 
   server.on('upgrade', (req, socket, head) => {
-    const pathname = parse(req.url || '/', true).pathname
-    if (shouldProxyToSanity(pathname)) {
-      proxySanityUpgrade(req, socket, head)
-      return
-    }
     if (upgradeHandler) {
       upgradeHandler(req, socket, head)
       return
@@ -825,11 +530,9 @@ app.prepare().then(() => {
     .listen(PORT, HOSTNAME, () => {
       console.log(`\n> Ready on http://${HOSTNAME}:${PORT}`)
       console.log(`  Chat        : http://${HOSTNAME}:${PORT}/chat`)
-      console.log(`  Sanity site : http://${HOSTNAME}:${PORT}${SANITY_BASE_PATH}/`)
-      console.log(`  Sanity admin: http://${HOSTNAME}:${PORT}${SANITY_BASE_PATH}/admin`)
       console.log(`  Key manager : http://${HOSTNAME}:${PORT}/chat/keys/`)
       console.log(`  Know (static): http://${HOSTNAME}:${PORT}/know/index.html`)
       console.log(`  Know (Next) : http://${HOSTNAME}:${PORT}/know`)
-      console.log(`  Static      : all webroot dirs except /chat and /sanity`)
+      console.log(`  Static      : all webroot dirs except /chat`)
     })
 })

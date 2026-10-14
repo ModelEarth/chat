@@ -21,7 +21,7 @@ When the user says **`start chat`**, first **ask the localhost user which mode t
 
 | Mode | Command (run from the webroot root) | Port | Serves |
 |---|---|---|---|
-| **webroot** | `nohup node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app **+** sibling static repos (`/localsite/`, `/team/`, `/chat/auth/`, …) **+** mounted `/sanity` |
+| **webroot** | `nohup node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app **+** sibling static repos (`/localsite/`, `/team/`, `/chat/auth/`, …) |
 | **webroot + turbopack** | `nohup TURBOPACK=1 node chat/server.mjs > /tmp/chat-dev.log 2>&1 &` | **3700** | same as webroot but with Turbopack HMR (may spike CPU/file handles on large webroot trees) |
 | **chat repo** | `nohup pnpm --prefix chat dev > /tmp/chat-dev.log 2>&1 &` | **3700** | chat app only (Turbopack HMR, no static repos) |
 
@@ -31,7 +31,7 @@ In **both** modes the chat app sits at the **server root** — there is no `/cha
 # Check the chosen port isn't already in use first:
 lsof -ti:3700        # both modes use port 3700
 
-# First run only: pnpm --prefix chat install   (+ bun --cwd sanity install for webroot mode)
+# First run only: pnpm --prefix chat install
 # Then start with the command for the chosen mode above, and confirm it's up:
 sleep 4 && cat /tmp/chat-dev.log
 ```
@@ -70,12 +70,11 @@ URL: http://localhost:3001 — ComfyUI Deploy dashboard (requires Clerk keys).
 
 ### Unified server (recommended for webroot development)
 
-`chat/server.mjs` is a custom Node.js server that boots the chat Next.js app, prepares a chat-owned runtime copy of the `sanity/` submodule, starts that mounted Sanity Next.js site, and serves sibling webroot static repos from a single port — no separate Python server needed.
+`chat/server.mjs` is a custom Node.js server that boots the chat Next.js app and serves sibling webroot static repos from a single port — no separate Python server needed.
 
 ```bash
 # 1. Install dependencies (first time only, or after pulling new commits)
 pnpm --prefix chat install
-bun --cwd sanity install
 
 # 2. Start the unified server from the webroot root:
 node chat/server.mjs               # → http://localhost:3700 (webpack, default)
@@ -87,7 +86,6 @@ pnpm --prefix chat dev:webroot
 ```
 
 The server loads the local env file — the one `automation/paths.yaml`'s `env_file:` key points at, resolved from the webroot root — automatically before booting Next.js. See "Environment Variables" below.
-When `sanity/` is present, it prepares a derived runtime copy outside the submodule, starts the Sanity Next.js dev server on an internal port, and mounts it at `/sanity` on the same public host.
 
 #### URL layout on the unified server
 
@@ -100,18 +98,16 @@ The **chat app occupies the root** — no path prefix:
 | `localhost:3700/chat/[id]` | a conversation |
 | `localhost:3700/settings` | settings |
 | `localhost:3700/chat/keys/` | standalone key manager widget |
-| `localhost:3700/sanity/` | Sanity frontend |
-| `localhost:3700/sanity/admin` | Sanity Studio |
 | `localhost:3700/localsite/…` | `localsite/` static files |
 | `localhost:3700/team/…` | `team/` static files |
 | `localhost:3700/requests/…` | `requests/` static files |
 | `localhost:3001/` | ComfyUI Deploy dashboard (when `workflow/` present) |
 
-Static repo paths (`/localsite/`, `/team/`, `/requests/`, `/realitystream/`, `/data-pipeline/`, `/home/`) are served directly from the filesystem before Next.js sees the request. `/sanity/*` is proxied to the Sanity Next.js app, and everything else goes to chat Next.js.
+Static repo paths (`/localsite/`, `/team/`, `/requests/`, `/realitystream/`, `/data-pipeline/`, `/home/`) are served directly from the filesystem before Next.js sees the request; everything else goes to chat Next.js.
 
 #### Why port 3700?
 
-3700 is the chat server default in **both** modes (`node chat/server.mjs` and `pnpm --prefix chat dev`), so `api_url_development` is a single constant. The mounted Sanity dev server uses **3701** internally (`SANITY_PORT`). Port 8887 is the existing Python static server; set `PORT=8887 node chat/server.mjs` to replace it entirely. 3700/3701 were chosen to avoid collisions with the common 3000/8080 dev ports and the local 8887/8888 servers.
+3700 is the chat server default in **both** modes (`node chat/server.mjs` and `pnpm --prefix chat dev`), so `api_url_development` is a single constant. Port 8887 is the existing Python static server; set `PORT=8887 node chat/server.mjs` to replace it entirely. 3700 was chosen to avoid collisions with the common 3000/8080 dev ports and the local 8887/8888 servers.
 
 ### Chat-only development
 
@@ -471,7 +467,7 @@ Vercel dashboard settings for Mode B:
 
 ### `server.mjs` is local dev only
 
-`chat/server.mjs` is the **local unified development server** — it is never invoked by Vercel. Vercel runs `next build` then `next start` (or its own Next.js serverless runtime). The static-file routing, Sanity proxy, and sibling-repo serving in `server.mjs` have no equivalent on Vercel.
+`chat/server.mjs` is the **local unified development server** — it is never invoked by Vercel. Vercel runs `next build` then `next start` (or its own Next.js serverless runtime). The static-file routing and sibling-repo serving in `server.mjs` have no equivalent on Vercel.
 
 ### Path resolution must stay relative
 
