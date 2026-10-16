@@ -222,6 +222,7 @@
             font-size: 11px;
             color: #888;
             font-style: italic;
+            white-space: pre-line;
             margin-bottom: 8px;
             min-height: 1.4em;
         }
@@ -1670,7 +1671,7 @@ function renderAll() {
     syncControls();
     document.getElementById("status-msg").textContent =
         rows.length
-        ? "Showing " + rows.length + " flow rows for " + stateLabel(appState.selectedState) + ". Double-click a partner to refocus the map."
+        ? "Showing " + rows.length + " flow rows for " + stateLabel(appState.selectedState) + ".\nDouble-click a state to refocus the map."
         : "No matching rows for the current selection.";
 }
 
