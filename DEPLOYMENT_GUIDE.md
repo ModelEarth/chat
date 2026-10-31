@@ -13,7 +13,11 @@ Each contributor should have their own instance separate from the main `modelear
 
 ---
 
-## Step 1 — Create a Supabase Project
+## Step 1 — Create a Neon Database
+
+We're using Neon instead of Supabase
+
+## Step 1 — Create a Supabase Project (Legacy)
 
 1. Go to [supabase.com](https://supabase.com) → sign in → **New Project**
 2. Name it `your-name-chat` 
