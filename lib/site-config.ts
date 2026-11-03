@@ -60,7 +60,8 @@ function readCookie(name: string): string | null {
 }
 
 // Matches localsite's order: the modelsite cookie, then domain_contains,
-// then default.
+// then default. domain_contains matches whole parts of the host name, so
+// bcd.com matches bcd.com and www.bcd.com but not abcd.com.
 function pickSite({ default: defaultId, sites }: SiteConfig): SiteConfigEntry | null {
   const modelsite = readCookie("modelsite");
   if (modelsite && sites[modelsite]) return sites[modelsite];
@@ -69,7 +70,7 @@ function pickSite({ default: defaultId, sites }: SiteConfig): SiteConfigEntry | 
       .split(",")
       .map((d) => d.trim())
       .filter(Boolean);
-    if (domains.some((d) => location.href.includes(d))) return site;
+    if (domains.some((d) => `.${location.hostname}.`.includes(`.${d.toLowerCase()}.`))) return site;
   }
   return (defaultId && sites[defaultId]) || null;
 }
