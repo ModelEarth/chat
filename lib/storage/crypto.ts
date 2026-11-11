@@ -125,6 +125,9 @@ export function isServerEncrypted(value: string): boolean {
 // ── RSA-OAEP server-key encryption (Phase 9) ─────────────────────────────────
 
 let _cachedServerPublicKey: CryptoKey | null = null;
+let _publicKeyUnavailable = false;
+// Providers the server can use from an encrypted key (/api/public-key's server_providers).
+let _serverProviders: string[] = [];
 
 /**
  * Fetch the server's RSA public key from /api/public-key and import it as a
@@ -134,30 +137,52 @@ let _cachedServerPublicKey: CryptoKey | null = null;
  */
 export async function fetchServerPublicKey(): Promise<CryptoKey> {
   if (_cachedServerPublicKey) return _cachedServerPublicKey;
-  const res = await fetch("/api/public-key");
-  if (!res.ok) throw new Error("Server public key unavailable");
-  const jwk = await res.json();
-  _cachedServerPublicKey = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["encrypt"]
-  );
-  return _cachedServerPublicKey;
+  if (_publicKeyUnavailable) throw new Error("Server public key unavailable");
+  try {
+    const res = await fetch("/api/public-key");
+    if (!res.ok) throw new Error("Server public key unavailable");
+    const jwk = await res.json();
+    _serverProviders = Array.isArray(jwk.server_providers) ? jwk.server_providers : [];
+    _cachedServerPublicKey = await crypto.subtle.importKey(
+      "jwk",
+      { kty: jwk.kty, n: jwk.n, e: jwk.e },
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
+    return _cachedServerPublicKey;
+  } catch (error) {
+    _publicKeyUnavailable = true;
+    throw error;
+  }
+}
+
+/** Whether the server can use this provider's key from an encrypted value. */
+export async function serverCanUse(provider: string): Promise<boolean> {
+  try {
+    await fetchServerPublicKey();
+    return _serverProviders.includes(provider);
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Encrypt plaintext with the server's RSA public key.
+ * Encrypt a provider's key with the server's RSA public key, as
+ * "<provider>\n<key>" so the server opens it only for that provider.
  * Returns a "rsa:<base64>" string that only the server can decrypt.
- * Throws if the server key is unavailable.
+ * Throws if the server key is unavailable or the server can't use this
+ * provider's key, so the caller keeps it in the browser instead.
  */
-export async function encryptForServer(plaintext: string): Promise<string> {
+export async function encryptForServer(plaintext: string, provider: string): Promise<string> {
   const key = await fetchServerPublicKey();
+  if (!_serverProviders.includes(provider)) {
+    throw new Error(`The server can't use ${provider} keys`);
+  }
   const ct = await crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     key,
-    new TextEncoder().encode(plaintext)
+    new TextEncoder().encode(`${provider}\n${plaintext}`)
   );
   const b64 = btoa(String.fromCharCode(...new Uint8Array(ct)));
   return `rsa:${b64}`;

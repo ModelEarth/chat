@@ -7,12 +7,17 @@
  *
  * Keys are encrypted at rest using the Web Crypto API with a non-extractable
  * AES-GCM-256 key stored in IndexedDB — matching crypto.ts in the Next.js app.
+ * That stops a script copying the AES key out, but not asking the browser to use
+ * it. So where the server publishes a public key (/api/public-key) and names a
+ * provider in server_providers, that provider's key is encrypted for the server
+ * instead ("rsa:..."), and pages here can't read it again once it's saved.
  *
  * Public API (window.KeyManager):
  *   KeyManager.init(containerEl, options)  — render widget into a container element
  *   KeyManager.get(providerId)             — returns plaintext key or null (from cache)
+ *   KeyManager.forServer(providerId)       — what to send a server as the key: "rsa:..." or plaintext
  *   KeyManager.set(providerId, value)      — encrypts and writes to settings_api-keys
- *   KeyManager.has(providerId)             — boolean (from cache)
+ *   KeyManager.has(providerId)             — boolean (in the cache, or saved for the server)
  *   KeyManager.remove(providerId)          — deletes from cache + storage
  *   KeyManager.getAll()                    — returns full settings_api-keys object (raw/encrypted)
  *   KeyManager.migrateFromLegacy()         — one-time migration from aPro / ${aiType}_api_key
@@ -37,6 +42,7 @@
     location.protocol === 'https:' ||
     location.port === '3000' ||
     location.port === '3700' ||
+    location.port === '3701' ||
     location.port === '8888'
   );
 
@@ -46,16 +52,23 @@
   var PUBLIC_KEY_URL = DEFAULT_PUBLIC_KEY_URL;
 
   var _cachedServerPublicKey = null;
+  var _publicKeyFailedUrl = null;
+  // Providers the server says it can use from an encrypted key. Null on a server
+  // that doesn't say (chat's), where every key is encrypted for it, unlabelled.
+  var _serverProviders = null;
 
   function _fetchServerPublicKey() {
     if (_cachedServerPublicKey) return Promise.resolve(_cachedServerPublicKey);
     if (!PUBLIC_KEY_URL) return Promise.reject(new Error('No public key endpoint'));
-    return fetch(PUBLIC_KEY_URL)
+    if (_publicKeyFailedUrl === PUBLIC_KEY_URL) return Promise.reject(new Error('Public key unavailable'));
+    var url = PUBLIC_KEY_URL;
+    return fetch(url)
       .then(function (r) {
         if (!r.ok) throw new Error('Public key unavailable');
         return r.json();
       })
       .then(function (jwk) {
+        _serverProviders = Array.isArray(jwk.server_providers) ? jwk.server_providers : null;
         return crypto.subtle.importKey(
           'jwk', jwk,
           { name: 'RSA-OAEP', hash: 'SHA-256' },
@@ -66,15 +79,25 @@
       .then(function (key) {
         _cachedServerPublicKey = key;
         return key;
+      })
+      .catch(function (err) {
+        _publicKeyFailedUrl = url;
+        throw err;
       });
   }
 
-  function _encryptForServer(plaintext) {
+  // Rejects for a provider the server can't use, so its key stays readable here.
+  // The provider's name goes inside, so the server can't be tricked into sending
+  // the key to a different provider.
+  function _encryptForServer(plaintext, providerId) {
     return _fetchServerPublicKey().then(function (key) {
+      if (_serverProviders && _serverProviders.indexOf(providerId) === -1) {
+        throw new Error('Not a provider the server can use');
+      }
       return crypto.subtle.encrypt(
         { name: 'RSA-OAEP' },
         key,
-        new TextEncoder().encode(plaintext)
+        new TextEncoder().encode(_serverProviders ? providerId + '\n' + plaintext : plaintext)
       );
     }).then(function (ct) {
       return 'rsa:' + btoa(String.fromCharCode.apply(null, new Uint8Array(ct)));
@@ -94,6 +117,17 @@
     ? '/api/validate-key'
     : null;
   var VALIDATE_KEY_URL = DEFAULT_VALIDATE_KEY_URL;
+
+  // Consumers embedding this widget outside of chat's own Next.js API routes
+  // (a standalone deploy, or another site pulling in this repo as a
+  // submodule) can point these URLs at their own backend — e.g. the
+  // CloudRoot/worker Cloudflare Worker's GET /api/key-status endpoint — by
+  // setting window.KEY_MANAGER_CONFIG before this script loads. Any field
+  // left unset keeps the USE_APP_API default above.
+  var _externalConfig = (typeof window !== 'undefined' && window.KEY_MANAGER_CONFIG) || {};
+  if (_externalConfig.publicKeyUrl !== undefined) PUBLIC_KEY_URL = _externalConfig.publicKeyUrl;
+  if (_externalConfig.serverKeysUrl !== undefined) SERVER_KEYS_URL = _externalConfig.serverKeysUrl;
+  if (_externalConfig.validateKeyUrl !== undefined) VALIDATE_KEY_URL = _externalConfig.validateKeyUrl;
 
   var _serverKeys = new Set();
   var _validatedKeys = new Set();
@@ -228,6 +262,7 @@
       if (_isEncrypted(stored)) {
         return _decryptValue(stored).then(function (pt) {
           _plaintextCache[providerId] = pt;
+          return _moveToServer(providerId, stored, pt);
         }).catch(function () {
           // Cannot decrypt (different browser key) — remove the stale entry.
           delete _plaintextCache[providerId];
@@ -235,16 +270,41 @@
       }
       // Plaintext key — cache it and re-encrypt (try RSA first).
       _plaintextCache[providerId] = stored;
-      return _encryptForServer(stored).then(function (rsaBlob) {
-        data[providerId] = rsaBlob;
-        _writeAllRaw(data);
+      return _encryptForServer(stored, providerId).then(function (rsaBlob) {
+        _replaceStored(providerId, stored, rsaBlob);
+        _forgetPlaintext(providerId, stored);
       }).catch(function () {
         return _encryptValue(stored).then(function (enc) {
-          data[providerId] = enc;
-          _writeAllRaw(data);
+          _replaceStored(providerId, stored, enc);
         }).catch(function () {});
       });
     }));
+  }
+
+  // Replaces a stored value, unless it was changed in the meantime.
+  function _replaceStored(providerId, expected, value) {
+    var data = _readAllRaw();
+    if (data[providerId] !== expected) return;
+    data[providerId] = value;
+    _writeAllRaw(data);
+  }
+
+  // A key saved before the server could hold it: re-encrypts it for the server.
+  function _moveToServer(providerId, stored, plaintext) {
+    return _fetchServerPublicKey().then(function () {
+      if (!_serverProviders) return;
+      return _encryptForServer(plaintext, providerId).then(function (rsaBlob) {
+        _replaceStored(providerId, stored, rsaBlob);
+        _forgetPlaintext(providerId, plaintext);
+      });
+    }).catch(function () {});
+  }
+
+  // Once a key is safely encrypted for the server, this page stops holding it,
+  // unless the visitor turned on the window for copying their keys.
+  function _forgetPlaintext(providerId, value) {
+    if (!_serverProviders || (localStorage.getItem(COPY_PREF_KEY) || 'off') !== 'off') return;
+    if (_plaintextCache[providerId] === value) delete _plaintextCache[providerId];
   }
 
   // -- Storage helpers (raw, operates on encrypted values) ---------------------
@@ -270,18 +330,35 @@
     return _plaintextCache[providerId] || null;
   }
 
+  function _serverBlob(providerId) {
+    var stored = _readAllRaw()[providerId];
+    return _isServerEncrypted(stored) ? stored : null;
+  }
+
+  // What to send a server as the key, in place of KeyManager.get().
+  function getKeyForServer(providerId) {
+    return _serverBlob(providerId) || getKey(providerId);
+  }
+
+  // The key to check with the validate endpoint, which only a server that names
+  // its providers can open when it's encrypted.
+  function _keyToValidate(providerId) {
+    return _serverProviders ? getKeyForServer(providerId) : getKey(providerId);
+  }
+
   function setKey(providerId, value) {
     // Update cache immediately.
     _plaintextCache[providerId] = value;
     // Record edit timestamp for the 1-hour export window.
     try { localStorage.setItem(LAST_EDIT_KEY, String(Date.now())); } catch (_) {}
     // Try RSA (server-only decryptable) first; fall back to browser AES.
-    _encryptForServer(value).then(function (rsaBlob) {
+    return _encryptForServer(value, providerId).then(function (rsaBlob) {
       var data = _readAllRaw();
       data[providerId] = rsaBlob;
       _writeAllRaw(data);
+      _forgetPlaintext(providerId, value);
     }).catch(function () {
-      _encryptValue(value).then(function (enc) {
+      return _encryptValue(value).then(function (enc) {
         var data = _readAllRaw();
         data[providerId] = enc;
         _writeAllRaw(data);
@@ -301,7 +378,7 @@
   }
 
   function hasKey(providerId) {
-    return !!getKey(providerId);
+    return !!getKey(providerId) || !!_serverBlob(providerId);
   }
 
   // -- Legacy migration ---------------------------------------------------------
@@ -320,9 +397,12 @@
     DEEPSEEK_API_KEY:              'deepseek',
     DISCORD_BOT_TOKEN:             'discord',
     GITHUB_PERSONAL_ACCESS_TOKEN:  'github',
+    GITHUB_REPORTS_TOKEN:          'github-reports',
     PINECONE_API_KEY:              'pinecone',
     VOYAGE_API_KEY:                'voyage',
     NEXT_PUBLIC_SUPABASE_URL:      'supabase',
+    BLOB_READ_WRITE_TOKEN:         'veil-blob',
+    FAL_KEY:                       'fal',
   };
 
   var PROVIDER_TO_ENV = {
@@ -338,9 +418,12 @@
     deepseek:   'DEEPSEEK_API_KEY',
     discord:    'DISCORD_BOT_TOKEN',
     github:     'GITHUB_PERSONAL_ACCESS_TOKEN',
+    'github-reports': 'GITHUB_REPORTS_TOKEN',
     pinecone:   'PINECONE_API_KEY',
     voyage:     'VOYAGE_API_KEY',
     supabase:   'NEXT_PUBLIC_SUPABASE_URL',
+    'veil-blob': 'BLOB_READ_WRITE_TOKEN',
+    fal:        'FAL_KEY',
   };
 
   var COPY_PREF_KEY = 'settings_copymykeys';
@@ -691,17 +774,27 @@
   function init(containerEl, options) {
     if (!containerEl) return;
     options = options || {};
-    SERVER_KEYS_URL = options.serverKeysUrl || DEFAULT_SERVER_KEYS_URL;
-    PUBLIC_KEY_URL = options.publicKeyUrl || DEFAULT_PUBLIC_KEY_URL;
-    VALIDATE_KEY_URL = options.validateKeyUrl || DEFAULT_VALIDATE_KEY_URL;
+    SERVER_KEYS_URL = options.serverKeysUrl || _externalConfig.serverKeysUrl || DEFAULT_SERVER_KEYS_URL;
+    PUBLIC_KEY_URL = options.publicKeyUrl || _externalConfig.publicKeyUrl || DEFAULT_PUBLIC_KEY_URL;
+    VALIDATE_KEY_URL = options.validateKeyUrl || _externalConfig.validateKeyUrl || DEFAULT_VALIDATE_KEY_URL;
 
     // Run crypto init and server key fetch in parallel; render once both settle.
     Promise.all([
-      _initCrypto().catch(function () {}),
+      _fetchServerPublicKey().catch(function () {}).then(_initCrypto).catch(function () {}),
       _loadServerKeys(),
     ]).then(function () {
       _renderWidget(containerEl, options);
     });
+  }
+
+  // #need=GITHUB_REPORTS_TOKEN (env names or provider ids, comma-separated): the keys a page needs set
+  function _neededProviderIds() {
+    var match = /(?:^#|&)need=([^&]*)/.exec(location.hash);
+    if (!match) return [];
+    return decodeURIComponent(match[1]).split(',').map(function (name) {
+      name = name.trim();
+      return ENV_TO_PROVIDER[name] || name;
+    }).filter(Boolean);
   }
 
   function _renderWidget(containerEl, options) {
@@ -709,7 +802,12 @@
     containerEl.innerHTML = '';
     containerEl.className = (containerEl.className + ' key-widget').trim();
 
-    if (_shouldShowGeminiStarterNotice(providers, options)) {
+    var neededIds = _neededProviderIds();
+    var needed = neededIds.map(function (id) {
+      return providers.filter(function (provider) { return provider.id === id; })[0];
+    }).filter(Boolean);
+
+    if (!needed.length && _shouldShowGeminiStarterNotice(providers, options)) {
       containerEl.appendChild(buildGeminiStarterNotice());
     }
 
@@ -717,7 +815,7 @@
     var pastePanel = buildPastePanel(function () {
       providers.forEach(function (provider) {
         _refreshStatusIcon(provider.id);
-        var key = getKey(provider.id);
+        var key = _keyToValidate(provider.id);
         if (key) _validateKey(provider.id, key);
       });
       var currentPref = localStorage.getItem(COPY_PREF_KEY) || 'off';
@@ -732,27 +830,64 @@
     var list = document.createElement('div');
     list.className = 'key-provider-list';
 
-    providers.forEach(function (provider) {
-      list.appendChild(buildProviderCard(provider));
-    });
-
-    containerEl.appendChild(list);
+    if (needed.length) {
+      // Only the needed keys, open for entry, then Show More for the rest
+      appendProviderCards(list, needed, true);
+      containerEl.appendChild(list);
+      var more = document.createElement('div');
+      more.className = 'key-provider-list';
+      more.hidden = true;
+      appendProviderCards(more, providers.filter(function (provider) { return needed.indexOf(provider) === -1; }));
+      var moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'key-btn key-show-more';
+      moreBtn.textContent = 'Show More';
+      moreBtn.addEventListener('click', function () {
+        more.hidden = false;
+        moreBtn.remove();
+      });
+      containerEl.appendChild(moreBtn);
+      containerEl.appendChild(more);
+    } else {
+      appendProviderCards(list, providers);
+      containerEl.appendChild(list);
+    }
 
     // Trigger background validation for all stored browser keys
     providers.forEach(function (provider) {
-      var key = getKey(provider.id);
+      var key = _keyToValidate(provider.id);
       if (key) _validateKey(provider.id, key);
     });
 
     // Security notice
     var notice = document.createElement('div');
     notice.className = 'key-notice';
-    notice.innerHTML = ICON_INFO +
-      ' Keys are encrypted at rest using AES-GCM with a browser-bound key stored in IndexedDB.' +
-      ' That key is non-extractable — JavaScript cannot read its raw bytes, so it cannot be stolen by reading storage.' +
-      ' When you send a message, the key is briefly decrypted in memory and sent over HTTPS to the server, which passes it directly to the AI provider.' +
-      ' HTTPS prevents network interception, but code already running on this page (e.g. a malicious extension or XSS) could in theory read the key from memory at that moment.';
+    notice.innerHTML = ICON_INFO + (_serverProviders
+      ? ' Once saved, AI model keys are encrypted so that only this site\'s server can read them, and pages here can\'t read them back.' +
+        ' Each request sends the encrypted value over HTTPS, and the server decrypts it only to call that provider.' +
+        ' Code running on this site, such as a malicious extension or injected script, could still capture a key while you enter it, or spend a saved key through the server without seeing it.' +
+        ' Keys that pages use directly, such as GitHub tokens, can still be read by code running on this site.' +
+        ' Use keys with spending limits where your provider offers them.'
+      : ' Keys are encrypted in this browser using AES-GCM, with a key stored in IndexedDB that scripts cannot copy out.' +
+        ' Scripts running on this site can still ask the browser to decrypt your keys, so a malicious extension or injected script could read them whenever a page here is open.' +
+        ' Keys are sent over HTTPS to the server, which passes them to the AI provider.' +
+        ' Use keys with spending limits where your provider offers them.');
     containerEl.appendChild(notice);
+  }
+
+  // The cards, with a heading before the first key of each section (providers.js's section field)
+  function appendProviderCards(listEl, providers, needed) {
+    var section = null;
+    providers.forEach(function (provider) {
+      if (provider.section && provider.section !== section) {
+        var heading = document.createElement('h3');
+        heading.className = 'key-section-heading';
+        heading.textContent = provider.section;
+        listEl.appendChild(heading);
+      }
+      section = provider.section || null;
+      listEl.appendChild(buildProviderCard(provider, needed));
+    });
   }
 
   function _shouldShowGeminiStarterNotice(providers, options) {
@@ -778,13 +913,14 @@
     return notice;
   }
 
-  function buildProviderCard(provider) {
+  // needed: open with the key field showing, so a stored key that doesn't work can be replaced
+  function buildProviderCard(provider, needed) {
     var card = document.createElement('div');
     card.className = 'key-provider';
     card.id = 'key-provider-' + provider.id;
 
-    var startOpen = hasKey(provider.id);
-    var body = buildProviderBody(provider, startOpen);
+    var startOpen = needed || hasKey(provider.id);
+    var body = buildProviderBody(provider, startOpen, needed);
     var header = buildProviderHeader(provider, startOpen);
 
     header.addEventListener('click', function () {
@@ -842,7 +978,7 @@
     return header;
   }
 
-  function buildProviderBody(provider, startOpen) {
+  function buildProviderBody(provider, startOpen, needed) {
     var body = document.createElement('div');
     body.className = 'key-provider-body';
     body.hidden = !startOpen;
@@ -894,7 +1030,7 @@
     // Key input section — hidden by default when browser key is already set
     var keyRow = document.createElement('div');
     keyRow.className = 'key-key-row';
-    keyRow.hidden = browserKeyPresent;
+    keyRow.hidden = browserKeyPresent && !needed;
 
     var label = document.createElement('div');
     label.className = 'key-key-label';
@@ -905,7 +1041,7 @@
     getKeyLink.href = provider.getKeyUrl;
     getKeyLink.target = '_blank';
     getKeyLink.rel = 'noopener';
-    getKeyLink.textContent = (keyPresent ? 'Get new key ↗' : 'Get key ↗');
+    getKeyLink.textContent = (keyPresent ? 'Get New Key ↗' : 'Get Key ↗');
     label.appendChild(labelSpan);
     label.appendChild(getKeyLink);
 
@@ -915,7 +1051,9 @@
     var input = document.createElement('input');
     input.type = 'password';
     input.className = 'key-key-input';
-    input.placeholder = provider.keyPlaceholder || 'Paste your API key';
+    var emptyPlaceholder = provider.keyPlaceholder || 'Paste your API key';
+    var savedPlaceholder = 'Saved. Paste a new key to replace it.';
+    input.placeholder = _serverBlob(provider.id) ? savedPlaceholder : emptyPlaceholder;
     input.value = getKey(provider.id) || '';
     input.setAttribute('autocomplete', 'off');
 
@@ -975,7 +1113,8 @@
 
       statusMsg.className = 'key-status-msg ok';
       statusMsg.innerHTML =
-        'The ' + provider.name + ' key is encrypted in your browser storage. ' +
+        'The ' + provider.name + ' key is encrypted in your browser storage' +
+        (_serverBlob(provider.id) ? ', readable only by this site\'s server. ' : '. ') +
         '<button type="button" class="key-status-link key-status-link-danger">Delete key</button>';
 
       var deleteBtn = statusMsg.querySelector('.key-status-link-danger');
@@ -985,7 +1124,8 @@
         removeKey(provider.id);
         _validatedKeys.delete(provider.id);
         _invalidKeys.delete(provider.id);
-        getKeyLink.textContent = 'Get key ↗';
+        getKeyLink.textContent = 'Get Key ↗';
+        input.placeholder = emptyPlaceholder;
         clearStatus();
         setKeyRowOpen(true);
         refreshHeaderStatus();
@@ -1012,21 +1152,30 @@
 
     function submitKeyValue() {
       var val = input.value.trim();
+      if (!val && _serverBlob(provider.id)) {
+        // The field is empty because this key can't be shown, not because it was cleared.
+        showStatus(statusMsg, 'This key is saved but can\'t be shown. Paste a new key to replace it, or use the key icon to delete it.', 'ok');
+        return;
+      }
       if (!val) {
         removeKey(provider.id);
         _validatedKeys.delete(provider.id);
         _invalidKeys.delete(provider.id);
         showStatus(statusMsg, 'Key removed.', 'ok');
-        getKeyLink.textContent = 'Get key ↗';
+        getKeyLink.textContent = 'Get Key ↗';
         refreshHeaderStatus();
         refreshEditKeyVisibility();
         return;
       }
-      setKey(provider.id, val);
+      setKey(provider.id, val).then(function () {
+        if (!_serverBlob(provider.id) || input.value.trim() !== val) return;
+        input.value = '';
+        input.placeholder = savedPlaceholder;
+      });
       _validatedKeys.delete(provider.id);
       _invalidKeys.delete(provider.id);
       showStatus(statusMsg, 'Key saved. Validating…', 'ok');
-      getKeyLink.textContent = 'Get new key ↗';
+      getKeyLink.textContent = 'Get New Key ↗';
       refreshHeaderStatus();
       refreshEditKeyVisibility();
       _validateKey(provider.id, val);
@@ -1054,8 +1203,39 @@
     if (provider.keyHint) {
       var hintEl = document.createElement('div');
       hintEl.className = 'key-key-hint';
-      hintEl.textContent = provider.keyHint;
+      // "Get Key" in a hint links to the provider's getKeyUrl
+      var hintParts = provider.keyHint.split('Get Key');
+      if (hintParts.length > 1 && provider.getKeyUrl) {
+        var hintLink = document.createElement('a');
+        hintLink.href = provider.getKeyUrl;
+        hintLink.target = '_blank';
+        hintLink.rel = 'noopener';
+        hintLink.textContent = 'Get Key';
+        hintEl.appendChild(document.createTextNode(hintParts[0]));
+        hintEl.appendChild(hintLink);
+        hintEl.appendChild(document.createTextNode(hintParts.slice(1).join('Get Key')));
+      } else {
+        hintEl.textContent = provider.keyHint;
+      }
       keyRow.appendChild(hintEl);
+    }
+    if (provider.keySteps && provider.keySteps.length) {
+      var stepsEl = document.createElement('ol');
+      stepsEl.className = 'key-key-steps';
+      provider.keySteps.forEach(function (step) {
+        var li = document.createElement('li');
+        li.textContent = step;
+        stepsEl.appendChild(li);
+      });
+      keyRow.appendChild(stepsEl);
+    }
+    if (provider.localNote) {
+      // Hidden until localsite.js shows .localonly on localhost
+      var localNoteEl = document.createElement('div');
+      localNoteEl.className = 'key-key-steps-note localonly';
+      localNoteEl.style.display = 'none';
+      localNoteEl.textContent = provider.localNote;
+      keyRow.appendChild(localNoteEl);
     }
     keyRow.appendChild(label);
     keyRow.appendChild(inputWrap);
@@ -1149,6 +1329,7 @@
   window.KeyManager = {
     init: init,
     get: getKey,
+    forServer: getKeyForServer,
     set: setKey,
     has: hasKey,
     remove: removeKey,

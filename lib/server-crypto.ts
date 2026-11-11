@@ -18,6 +18,10 @@ import {
   constants,
 } from "node:crypto";
 
+// Providers whose keys the server uses from an encrypted value: each is sent
+// only to that provider's own API. Also listed in server.mjs (local dev).
+export const SERVER_KEY_PROVIDERS = ["google", "anthropic", "openai", "pinecone", "voyage"];
+
 let _cachedPrivateKey: ReturnType<typeof createPrivateKey> | null = null;
 
 function getServerPrivateKey(): ReturnType<typeof createPrivateKey> | null {
@@ -37,13 +41,14 @@ function getServerPrivateKey(): ReturnType<typeof createPrivateKey> | null {
 
 /**
  * Decrypt a "rsa:<base64>" blob that was encrypted by the browser using the
- * server public key via RSA-OAEP / SHA-256.
- * Returns the plaintext string, or null if the key is not configured or
- * decryption fails.
+ * server public key via RSA-OAEP / SHA-256. It holds "<provider>\n<key>", and
+ * opens only for that provider, so a key can't be sent to another provider.
+ * Returns the key, or null if the server key is not configured, the blob is
+ * for another provider, or decryption fails.
  */
-export function decryptWithServerKey(blob: string): string | null {
+export function decryptWithServerKey(blob: string, provider: string): string | null {
   const privateKey = getServerPrivateKey();
-  if (!privateKey) return null;
+  if (!privateKey || !SERVER_KEY_PROVIDERS.includes(provider)) return null;
   try {
     const b64 = blob.startsWith("rsa:") ? blob.slice(4) : blob;
     const ciphertext = Buffer.from(b64, "base64");
@@ -55,7 +60,10 @@ export function decryptWithServerKey(blob: string): string | null {
       },
       ciphertext
     );
-    return plaintext.toString("utf-8");
+    const text = plaintext.toString("utf-8");
+    const split = text.indexOf("\n");
+    if (split < 0 || text.slice(0, split) !== provider) return null;
+    return text.slice(split + 1) || null;
   } catch {
     return null;
   }
@@ -70,8 +78,8 @@ export function getServerPublicKeyJwk(): object | null {
   const privateKey = getServerPrivateKey();
   if (!privateKey) return null;
   try {
-    const publicKey = createPublicKey(privateKey);
-    return publicKey.export({ format: "jwk" }) as object;
+    const { kty, n, e } = createPublicKey(privateKey).export({ format: "jwk" });
+    return { kty, n, e, server_providers: SERVER_KEY_PROVIDERS };
   } catch {
     return null;
   }

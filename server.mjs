@@ -32,7 +32,7 @@ import { connect } from 'node:net'
 import { parse } from 'node:url'
 import { join, extname, resolve, dirname } from 'node:path'
 import { createReadStream, statSync, existsSync } from 'node:fs'
-import { createPrivateKey, createPublicKey } from 'node:crypto'
+import { createPrivateKey, createPublicKey, privateDecrypt, constants } from 'node:crypto'
 import { freemem, totalmem, loadavg } from 'node:os'
 import { getHeapStatistics } from 'node:v8'
 import { fileURLToPath } from 'node:url'
@@ -165,16 +165,39 @@ function sendJson(res, statusCode, data) {
   res.end(JSON.stringify(data))
 }
 
-function getServerPublicKeyJwk() {
+// Providers whose keys chat's routes use from an encrypted value
+// (SERVER_KEY_PROVIDERS in lib/server-crypto.ts).
+const SERVER_KEY_PROVIDERS = ['google', 'anthropic', 'openai', 'pinecone', 'voyage']
+
+function serverPrivateKey() {
   const pem = process.env.BROWSER_ENCRYPTION_PRIVATE_KEY
   if (!pem) return null
   try {
-    const privateKey = createPrivateKey({
-      key: pem.replace(/\\n/g, '\n'),
-      format: 'pem',
-    })
-    const publicKey = createPublicKey(privateKey)
-    return publicKey.export({ format: 'jwk' })
+    return createPrivateKey({ key: pem.replace(/\\n/g, '\n'), format: 'pem' })
+  } catch {
+    return null
+  }
+}
+
+function getServerPublicKeyJwk() {
+  const privateKey = serverPrivateKey()
+  if (!privateKey) return null
+  const { kty, n, e } = createPublicKey(privateKey).export({ format: 'jwk' })
+  return { kty, n, e, server_providers: SERVER_KEY_PROVIDERS }
+}
+
+// An "rsa:..." key from the keys page, opened only for the provider it was saved for.
+function openEncryptedKey(blob, provider) {
+  const privateKey = serverPrivateKey()
+  if (!privateKey || !SERVER_KEY_PROVIDERS.includes(provider)) return null
+  try {
+    const text = privateDecrypt(
+      { key: privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+      Buffer.from(blob.slice(4), 'base64'),
+    ).toString('utf8')
+    const split = text.indexOf('\n')
+    if (split < 0 || text.slice(0, split) !== provider) return null
+    return text.slice(split + 1) || null
   } catch {
     return null
   }
@@ -376,11 +399,19 @@ async function tryInternalApi(req, pathname, res) {
   if (pathname === '/api/validate-key' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req)
-      const { provider, key } = body || {}
+      const { provider } = body || {}
+      let key = body?.key
 
       if (!provider || !key) {
         sendJson(res, 400, { error: 'Missing provider or key' })
         return true
+      }
+      if (String(key).startsWith('rsa:')) {
+        key = openEncryptedKey(String(key), provider)
+        if (!key) {
+          sendJson(res, 200, { valid: false })
+          return true
+        }
       }
 
       const valid = await validateProviderKey(provider, key)

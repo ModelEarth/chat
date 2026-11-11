@@ -12,6 +12,32 @@ const localsiteDirs = process.env.VERCEL ? ['public/localsite'] : ['public/local
 const hasLocalsite = localsiteDirs
     .some((dir) => existsSync(join(__dirname, dir, 'js', 'localsite.js')))
 
+// Content-Security-Policy for the pages where people type API keys. Scripts and
+// connections are limited to this site (and, on settings, the APIs it checks
+// keys with), so injected code can't load scripts from elsewhere or send keys
+// to another host with fetch. Next.js's inline scripts need 'unsafe-inline',
+// and its dev server needs 'unsafe-eval'.
+const supabaseOrigin = (() => {
+    try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin } catch { return '' }
+})()
+const SETTINGS_CONNECT = ['https://api.anthropic.com', 'https://api.openai.com',
+    'https://generativelanguage.googleapis.com', 'https://api.github.com', supabaseOrigin].filter(Boolean)
+function keyPageHeaders(connect = []) {
+    const policy = [
+        "default-src 'self'",
+        `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"}`,
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        ["connect-src 'self'", ...connect].join(' '),
+        "frame-ancestors 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ].join('; ')
+    return [{ key: 'Content-Security-Policy', value: policy }]
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Baked in at build time. Every Vercel deploy is a new build, so this is
@@ -27,8 +53,12 @@ const nextConfig = {
             { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
             { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
         ];
-        if (process.env.NODE_ENV === 'production') return [];
-        return [{ source: '/api/auth/:path*', headers: devCorsHeaders }];
+        const keyPages = [
+            ...['/keys', '/key', '/chat/keys'].map((source) => ({ source, headers: keyPageHeaders() })),
+            ...['/settings', '/settings/:path*'].map((source) => ({ source, headers: keyPageHeaders(SETTINGS_CONNECT) })),
+        ];
+        if (process.env.NODE_ENV === 'production') return keyPages;
+        return [...keyPages, { source: '/api/auth/:path*', headers: devCorsHeaders }];
     },
     // /localsite/ on Vercel. With localsite copied into public/, Next.js
     // serves its files but not a folder's index.html, so folder paths are

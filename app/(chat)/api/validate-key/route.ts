@@ -11,9 +11,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { provider, key } = body;
+  const { provider } = body;
+  let key = body.key;
   if (!provider || !key) {
     return Response.json({ error: 'Missing provider or key' }, { status: 400 });
+  }
+  // A key the keys page encrypted for this server ("rsa:...").
+  if (key.startsWith('rsa:')) {
+    const { decryptWithServerKey } = await import('@/lib/server-crypto');
+    key = decryptWithServerKey(key, provider) ?? '';
+    if (!key) return Response.json({ valid: false });
   }
 
   try {

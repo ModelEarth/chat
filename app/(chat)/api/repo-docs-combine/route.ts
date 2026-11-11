@@ -17,7 +17,7 @@ async function readApiKeys(request: Request): Promise<LLMApiKeys> {
     const enc = request.headers.get(`x-${provider}-api-key-enc`);
     if (enc) {
       const { decryptWithServerKey } = await import("@/lib/server-crypto");
-      const decrypted = decryptWithServerKey(enc);
+      const decrypted = decryptWithServerKey(enc, provider);
       if (decrypted) keys[provider] = decrypted;
     }
   }

@@ -63,7 +63,7 @@
 .key-widget {
   font-family: var(--key-font);
   color: var(--key-text);
-  max-width: 680px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -73,6 +73,13 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/* With #need=, the rest of the keys sit after Show More */
+.key-provider-list[hidden] { display: none; }
+
+/* A section's heading (providers.js's section field), such as Planet.Live: The Veil */
+.key-section-heading { margin: 16px 0 0; font-size: 15px; font-weight: 600; color: var(--key-text); }
+.key-show-more { margin: 12px 0; }
 
 /* Provider card */
 .key-provider {
@@ -193,6 +200,62 @@
   color: var(--key-text-muted);
   line-height: 1.4;
   margin-bottom: 6px;
+}
+
+/* Links in hints, steps and notices */
+.key-key-hint a,
+.key-key-steps a,
+.key-notice a {
+  color: var(--key-accent);
+  text-decoration: none;
+}
+
+.key-key-hint a:hover,
+.key-key-steps a:hover,
+.key-notice a:hover {
+  text-decoration: underline;
+}
+
+/* Dark mode: a lighter blue for text links (--key-accent stays for button backgrounds) */
+.dark .key-key-hint a,
+.dark .key-key-steps a,
+.dark .key-notice a,
+.dark .key-get-key-link,
+.dark .key-cli-info a,
+[data-theme="dark"] .key-key-hint a,
+[data-theme="dark"] .key-key-steps a,
+[data-theme="dark"] .key-notice a,
+[data-theme="dark"] .key-get-key-link,
+[data-theme="dark"] .key-cli-info a {
+  color: #60a5fa;
+}
+
+.dark .key-key-hint a:hover,
+.dark .key-key-steps a:hover,
+.dark .key-notice a:hover,
+.dark .key-get-key-link:hover,
+.dark .key-cli-info a:hover,
+[data-theme="dark"] .key-key-hint a:hover,
+[data-theme="dark"] .key-key-steps a:hover,
+[data-theme="dark"] .key-notice a:hover,
+[data-theme="dark"] .key-get-key-link:hover,
+[data-theme="dark"] .key-cli-info a:hover {
+  color: #93c5fd;
+}
+
+.key-key-steps {
+  font-size: 0.78rem;
+  color: var(--key-text-muted);
+  line-height: 1.4;
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.key-key-steps-note {
+  font-size: 0.78rem;
+  color: var(--key-text-muted);
+  line-height: 1.4;
+  margin: -4px 0 8px;
 }
 
 /* Key input row */

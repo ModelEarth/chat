@@ -16,6 +16,7 @@ import {
   decryptValue,
   encryptValue,
   encryptForServer,
+  serverCanUse,
   isEncrypted,
   isServerEncrypted,
 } from "./crypto";
@@ -225,13 +226,14 @@ class LocalStorageManager implements StorageManager {
     } catch (_) {}
 
     // Try RSA (server-only decryptable) first; fall back to browser AES.
-    encryptForServer(key)
+    encryptForServer(key, provider)
       .then((rsaBlob) => {
         const apiKeys =
           this.getStorageData<LocalStorageSchema["api-keys"]>("api-keys") || {};
         apiKeys[provider] = rsaBlob;
         this.setStorageData("api-keys", apiKeys);
         this._serverEncryptedProviders.add(provider);
+        this.forgetPlaintext(provider, key);
       })
       .catch(() => {
         // Server public key unavailable — fall back to browser AES encryption.
@@ -387,9 +389,15 @@ class LocalStorageManager implements StorageManager {
             : stored; // legacy plaintext — re-encrypt it now
           this._plaintextCache.set(provider, plaintext);
 
+          // A browser-encrypted key the server can now hold: re-encrypt it for
+          // the server, so pages here stop being able to read it.
+          if (isEncrypted(stored) && (await serverCanUse(provider))) {
+            await this.moveToServer(provider, stored, plaintext);
+          }
+
           // Re-encrypt any plaintext values found in storage (try RSA first).
           if (!isEncrypted(stored)) {
-            encryptForServer(plaintext)
+            encryptForServer(plaintext, provider)
               .then((rsaBlob) => {
                 const current =
                   this.getStorageData<LocalStorageSchema["api-keys"]>(
@@ -398,6 +406,7 @@ class LocalStorageManager implements StorageManager {
                 current[provider] = rsaBlob;
                 this.setStorageData("api-keys", current);
                 this._serverEncryptedProviders.add(provider);
+                this.forgetPlaintext(provider, plaintext);
               })
               .catch(() =>
                 encryptValue(stored)
@@ -419,6 +428,31 @@ class LocalStorageManager implements StorageManager {
         }
       })
     );
+  }
+
+  /** Replaces a stored key with one encrypted for the server, unless it changed meanwhile. */
+  private async moveToServer(provider: APIProvider, stored: string, plaintext: string): Promise<void> {
+    try {
+      const rsaBlob = await encryptForServer(plaintext, provider);
+      const current =
+        this.getStorageData<LocalStorageSchema["api-keys"]>("api-keys") || {};
+      if (current[provider] !== stored) return;
+      current[provider] = rsaBlob;
+      this.setStorageData("api-keys", current);
+      this._serverEncryptedProviders.add(provider);
+      this.forgetPlaintext(provider, plaintext);
+    } catch {
+      // Stays browser-encrypted.
+    }
+  }
+
+  /**
+   * Once a key is encrypted for the server, the browser stops holding it, so
+   * code running on these pages can't read it. getAPIKey() then returns null
+   * and callers send getEncryptedBlob() instead.
+   */
+  private forgetPlaintext(provider: APIProvider, value: string): void {
+    if (this._plaintextCache.get(provider) === value) this._plaintextCache.delete(provider);
   }
 
   /**

@@ -189,11 +189,11 @@ export async function POST(request: Request) {
       const { decryptWithServerKey } = await import("@/lib/server-crypto");
       if (!pineconeApiKeyOverride && pineconeApiKeyEnc) {
         pineconeApiKeyOverride =
-          decryptWithServerKey(pineconeApiKeyEnc) ?? undefined;
+          decryptWithServerKey(pineconeApiKeyEnc, "pinecone") ?? undefined;
       }
       if (!voyageApiKeyOverride && voyageApiKeyEnc) {
         voyageApiKeyOverride =
-          decryptWithServerKey(voyageApiKeyEnc) ?? undefined;
+          decryptWithServerKey(voyageApiKeyEnc, "voyage") ?? undefined;
       }
     }
 
@@ -260,7 +260,7 @@ export async function POST(request: Request) {
     let apiKey = rawApiKey;
     if (!apiKey && rawApiKeyEnc) {
       const { decryptWithServerKey } = await import("@/lib/server-crypto");
-      apiKey = decryptWithServerKey(rawApiKeyEnc);
+      apiKey = decryptWithServerKey(rawApiKeyEnc, "google");
     }
     const serverApiKey =
       process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
